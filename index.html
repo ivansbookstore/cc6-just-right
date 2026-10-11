@@ -3,29 +3,99 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Just Right — coming soon</title>
-<style>
-  :root { --bg:#f6f8f7; --ink:#1f2b29; --accent:#1f4e4a; --muted:#5b6b68; --card:#ffffff; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#121816; --ink:#e7eeec; --accent:#7cc4b6; --muted:#9fb0ac; --card:#1b2321; } }
-  * { box-sizing: border-box; }
-  body { margin:0; min-height:100vh; display:grid; place-items:center; padding:16px;
-         background:var(--bg); color:var(--ink); font:16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  .card { max-width:420px; width:100%; background:var(--card); border-radius:16px; padding:28px 24px;
-          box-shadow:0 2px 12px rgba(0,0,0,.08); text-align:center; }
-  .bowl { font-size:56px; line-height:1; }
-  h1 { margin:12px 0 4px; font-size:28px; color:var(--accent); }
-  p { margin:8px 0; color:var(--muted); }
-  .tag { display:inline-block; margin-top:12px; padding:4px 10px; border-radius:999px; font-size:13px;
-         background:var(--accent); color:var(--card); }
-</style>
+<meta name="description" content="Just Right — a canteen portion simulation for NTU vendors and students (CC0006 group project).">
+<title>Just Right</title>
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <main class="card">
-    <div class="bowl" aria-hidden="true">🍚</div>
-    <h1>Just Right</h1>
-    <p>A canteen portion simulation for NTU vendors and students.</p>
-    <p>CC0006 Sustainability group project.</p>
-    <span class="tag">Test page — game coming soon</span>
-  </main>
+<div class="wrap">
+
+  <!-- START -->
+  <section id="start" class="screen on">
+    <div class="hero">
+      <div class="bowl" aria-hidden="true">🍚</div>
+      <h1>Just Right</h1>
+      <p class="muted">A canteen portion simulation. Same customers, two ways of serving them:<br>
+        <b>Today</b> (one size) or <b>Just Right</b> (Regular and Small on the menu board).</p>
+    </div>
+    <div class="modes">
+      <button class="card mode" id="go-vendor">
+        <div class="ico" aria-hidden="true">👩‍🍳</div>
+        <h2>Be the vendor</h2>
+        <p class="muted">Serve the lunch rush at an economy rice stall. See the rice wasted, your profit and your rating at closing.</p>
+        <span class="badge">Play · about 3 minutes</span>
+      </button>
+      <button class="card mode" id="go-student" disabled aria-disabled="true">
+        <div class="ico" aria-hidden="true">🧑‍🎓</div>
+        <h2>Be the student</h2>
+        <p class="muted">A week of lunches with a hunger bar, a budget and a 2 pm lecture.</p>
+        <span class="badge">Coming soon</span>
+      </button>
+    </div>
+    <p style="text-align:center;margin-top:14px"><button class="link" data-go="how">How this works — every number and where it comes from</button></p>
+  </section>
+
+  <!-- SETUP -->
+  <section id="setup" class="screen">
+    <button class="link" data-go="start">← Home</button>
+    <div class="card">
+      <h2>Your stall: economy rice, North Spine</h2>
+      <p class="muted">Lunch rush, 12:00 to 1:30. Pick how you serve.</p>
+      <div class="toggle" role="radiogroup" aria-label="Serving setting">
+        <button class="today" data-setting="today" role="radio"><b>Today</b><span class="muted small">One size. Students can ask for less rice.</span></button>
+        <button class="jr" data-setting="justright" role="radio"><b>Just Right</b><span class="muted small">Regular and Small on the board. Small is cheaper.</span></button>
+      </div>
+      <div id="setup-sliders"></div>
+      <div id="setup-note"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary grow" id="start-rush">Open the stall</button>
+      </div>
+      <p class="muted small desk-only" style="margin-top:8px">Keyboard: press 1–4 to serve, Space for the next customer.</p>
+    </div>
+  </section>
+
+  <!-- RUSH -->
+  <section id="rush" class="screen">
+    <div class="hud">
+      <span id="hud-setting" class="chip"></span>
+      <span class="chip" id="hud-count"></span>
+      <span class="chip" id="hud-rating"></span>
+      <span class="chip" id="hud-cash"></span>
+    </div>
+    <div class="stall">
+      <div class="card">
+        <div class="qlabel">Next in the queue</div>
+        <div class="queue" id="queue"></div>
+      </div>
+      <div class="card">
+        <div id="customer" class="customer"></div>
+        <div id="feedback" class="feedback" aria-live="polite"></div>
+        <div class="actions" id="actions"></div>
+      </div>
+      <div class="card">
+        <div class="board" id="board"></div>
+        <hr style="border:none;border-top:1px solid var(--line);margin:12px 0">
+        <div class="tally" id="tally"></div>
+        <button class="link small" id="auto-rest">Serve the rest automatically</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- REPORT -->
+  <section id="report" class="screen">
+    <div id="report-body"></div>
+  </section>
+
+  <!-- HOW -->
+  <section id="how" class="screen">
+    <button class="link" data-go="back">← Back</button>
+    <div id="how-body"></div>
+  </section>
+
+  <footer>Just Right · CC0006 Sustainability group project, NTU · Open source (MIT) · A simulation built on survey data and stated assumptions — not real sales data.</footer>
+</div>
+<script src="src/config.js"></script>
+<script src="src/engine.js"></script>
+<script src="src/ui.js"></script>
 </body>
 </html>
