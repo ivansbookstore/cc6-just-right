@@ -3,54 +3,46 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Just Right — a canteen portion simulation for NTU vendors and students (CC0006 group project).">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Just Right: a canteen portion simulation for NTU vendors and students (CC0006 group project).">
 <title>Just Right</title>
+<link rel="preload" href="fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<div class="wrap">
+<main class="wrap">
 
   <!-- START -->
   <section id="start" class="screen on">
     <div class="hero">
-      <div class="bowl" aria-hidden="true">🍚</div>
-      <h1>Just Right</h1>
-      <p class="muted">A canteen portion simulation. Same customers, two ways of serving them:<br>
-        <b>Today</b> (one size) or <b>Just Right</b> (Regular and Small on the menu board).</p>
+      <div>
+        <div class="brandmark" id="brandmark"></div>
+        <h1>Same customers.<br>Two menus.</h1>
+        <p class="lede">Serve an NTU lunch rush with one portion size, then with Regular and Small. See the waste, the profit and the ratings.</p>
+        <div class="modes">
+          <button class="card mode primary" id="go-vendor"></button>
+          <button class="card mode" id="go-student"></button>
+        </div>
+        <p><button class="link" data-go="how" id="how-link"></button></p>
+      </div>
+      <div class="card preview" id="preview" aria-live="polite"></div>
     </div>
-    <div class="modes">
-      <button class="card mode" id="go-vendor">
-        <div class="ico" aria-hidden="true">👩‍🍳</div>
-        <h2>Be the vendor</h2>
-        <p class="muted">Serve the lunch rush at an economy rice stall. See the rice wasted, your profit and your rating at closing.</p>
-        <span class="badge">Play · about 3 minutes</span>
-      </button>
-      <button class="card mode" id="go-student" disabled aria-disabled="true">
-        <div class="ico" aria-hidden="true">🧑‍🎓</div>
-        <h2>Be the student</h2>
-        <p class="muted">A week of lunches with a hunger bar, a budget and a 2 pm lecture.</p>
-        <span class="badge">Coming soon</span>
-      </button>
-    </div>
-    <p style="text-align:center;margin-top:14px"><button class="link" data-go="how">How this works — every number and where it comes from</button></p>
   </section>
 
   <!-- SETUP -->
   <section id="setup" class="screen">
-    <button class="link" data-go="start">← Home</button>
-    <div class="card">
+    <button class="link" data-go="start" id="back-home"></button>
+    <div class="card" style="margin-top:8px">
       <h2>Your stall: economy rice, North Spine</h2>
       <p class="muted">Lunch rush, 12:00 to 1:30. Pick how you serve.</p>
       <div class="toggle" role="radiogroup" aria-label="Serving setting">
         <button class="today" data-setting="today" role="radio"><b>Today</b><span class="muted small">One size. Students can ask for less rice.</span></button>
-        <button class="jr" data-setting="justright" role="radio"><b>Just Right</b><span class="muted small">Regular and Small on the board. Small is cheaper.</span></button>
+        <button class="jr" data-setting="justright" role="radio"><b>Just Right</b><span class="muted small">Regular and Small on the board. Small costs less.</span></button>
       </div>
       <div id="setup-sliders"></div>
       <div id="setup-note"></div>
-      <div class="row" style="margin-top:12px">
-        <button class="primary grow" id="start-rush">Open the stall</button>
-      </div>
-      <p class="muted small desk-only" style="margin-top:8px">Keyboard: press 1–4 to serve, Space for the next customer.</p>
+      <button class="primary" id="start-rush" style="width:100%;margin-top:6px">Open the stall</button>
+      <p class="muted small desk-only" style="margin-top:10px">Keyboard: press 1 to 4 to serve, Space for the next customer.</p>
     </div>
   </section>
 
@@ -59,24 +51,23 @@
     <div class="hud">
       <span id="hud-setting" class="chip"></span>
       <span class="chip" id="hud-count"></span>
+      <span class="spacer"></span>
       <span class="chip" id="hud-rating"></span>
       <span class="chip" id="hud-cash"></span>
     </div>
     <div class="stall">
-      <div class="card">
-        <div class="qlabel">Next in the queue</div>
+      <div class="card counter">
         <div class="queue" id="queue"></div>
-      </div>
-      <div class="card">
         <div id="customer" class="customer"></div>
         <div id="feedback" class="feedback" aria-live="polite"></div>
         <div class="actions" id="actions"></div>
       </div>
-      <div class="card">
-        <div class="board" id="board"></div>
-        <hr style="border:none;border-top:1px solid var(--line);margin:12px 0">
-        <div class="tally" id="tally"></div>
-        <button class="link small" id="auto-rest">Serve the rest automatically</button>
+      <div class="side">
+        <div class="card board" id="board"></div>
+        <div class="card">
+          <div class="tally" id="tally"></div>
+          <button class="link small" id="auto-rest">Serve the rest automatically</button>
+        </div>
       </div>
     </div>
   </section>
@@ -86,16 +77,39 @@
     <div id="report-body"></div>
   </section>
 
+  <!-- STUDENT: SETUP -->
+  <section id="s-setup" class="screen">
+    <button class="link" data-go="start" id="s-back-home"></button>
+    <div class="card" style="margin-top:8px">
+      <h2>One week of lunches</h2>
+      <p class="muted">Three quick questions set up your week. Your answers stay on this screen.</p>
+      <div id="s-quiz"></div>
+      <button class="primary" id="s-start" style="width:100%;margin-top:10px">Start Monday</button>
+    </div>
+  </section>
+
+  <!-- STUDENT: DAY -->
+  <section id="s-day" class="screen">
+    <div class="hud" id="s-hud"></div>
+    <div id="s-body"></div>
+  </section>
+
+  <!-- STUDENT: WEEK REPORT -->
+  <section id="s-report" class="screen">
+    <div id="s-report-body"></div>
+  </section>
+
   <!-- HOW -->
   <section id="how" class="screen">
-    <button class="link" data-go="back">← Back</button>
+    <button class="link" data-go="back" id="back-how"></button>
     <div id="how-body"></div>
   </section>
 
-  <footer>Just Right · CC0006 Sustainability group project, NTU · Open source (MIT) · A simulation built on survey data and stated assumptions — not real sales data.</footer>
-</div>
+  <footer>Just Right is a CC0006 Sustainability group project at NTU, open source under the MIT licence. It is a simulation built on our survey data and stated assumptions, not real sales data.</footer>
+</main>
 <script src="src/config.js"></script>
 <script src="src/engine.js"></script>
+<script src="src/icons.js"></script>
 <script src="src/ui.js"></script>
 </body>
 </html>

@@ -1,61 +1,60 @@
 # Just Right
 
-A canteen portion simulation for NTU vendors and students — CC0006 Sustainability group project.
+A canteen portion simulation for NTU vendors and students, built for the CC0006 Sustainability group project.
 
 **Play:** https://ivansbookstore.github.io/cc6-just-right/ (phone or computer, nothing to install)
 
 ## What it is
 
-Same customers, two ways of serving them:
+The same customers, served two ways:
 
-- **Today** — one portion size. Students who speak up can ask for less rice; quiet ones get a Regular plate.
-- **Just Right** — Regular and Small on the menu board, Small priced a little lower, so everyone can pick the size that fits.
+- **Today**: one portion size. Students who speak up can ask for less rice; quiet ones get a Regular plate.
+- **Just Right**: Regular and Small on the menu board, with Small priced a little lower, so everyone can pick the size that fits.
 
 Because both settings use exactly the same customers, any difference comes from the menu, not luck.
 
-## Status
+## Two modes
 
-| Part | Status |
-|---|---|
-| Vendor mode: lunch rush, Today / Just Right switch, end-of-day report | Playable (v0.1) |
-| Shortcut challenge — how ratings drop when every plate is quietly shrunk | In the end-of-day report |
-| "How this works" screen — every number, its source, adjustable | Playable |
-| Student mode — a week of lunches with a hunger bar | Coming next |
+**Be the vendor.** Serve a 20-customer lunch rush at an economy rice stall. Each customer has a hidden appetite and a line of speech; you choose how to serve them before they lose patience. The closing report compares Today and Just Right for a full day of 80 plates (environment, society, economy), shows what your own play did, and runs a three-day "shortcut" where the vendor quietly shrinks every plate, to show how ratings drop.
 
-## How it works
-
-Every customer has a hidden appetite. They eat what they want and leave the rest — unless they are a Clean-Plater, who finishes everything and overeats instead. Taste letdowns and rushing make people leave food whatever the plate size, so the game also shows what a smaller plate does **not** fix.
-
-- Profit = takings − rice cost − everything else on the plate.
-- A Small plate breaks even when the discount ≤ rice cost of a Regular plate × (1 − Small share) × (1 + cooking buffer).
-- Customers rate each meal 1–5 stars. In the shortcut challenge, tomorrow's customers rise or fall with today's rating.
+**Be the student.** Answer three questions (how much you usually finish, how often you eat breakfast, your weekly budget), then eat lunch Monday to Friday. Pick a stall, eat bite by bite while a hunger bar fills, and stop when you like. Stopping too early leaves you hungry; finishing a big plate can leave you stuffed in a 2 pm lecture; leaving rice wastes food. Then replay the same week with a Small plate at the Just Right stall and compare.
 
 ## Where the numbers come from
 
 Every number lives in [`src/config.js`](src/config.js) with its source and a status:
 
-- **survey** — our NTU student survey (wave 1, 22 responses)
-- **vendor** — our vendor survey (to be confirmed)
-- **assumption** — no data yet; shown as such in the game
+- **survey**: our NTU student survey (wave 1, 22 responses)
+- **vendor**: our vendor survey (early answers, to be confirmed)
+- **assumption**: no data yet, shown as such in the game
 
-Change a value there (or on the in-game "How this works" screen) and the whole game follows. Results are a simulation under stated assumptions — not real sales or waste data.
+Change a value there, or on the in-game "How this works" screen, and both modes follow. Results are a simulation under stated assumptions, not real sales or waste data. All student-mode stall prices, portions, queues and ratings are assumptions for the game.
+
+## Checks
+
+```
+node tests/engine.test.js     # core model tests
+node tests/audit_vendor.js    # vendor mode: every persona, every setting at its limits, 300 random rushes, direction checks
+node tests/audit_student.js   # student mode: every appetite, breakfast habit and budget; simulated players; money, time and waste rules
+```
 
 ## Project layout
 
 ```
-index.html          the page
-css/style.css       layout for phone and computer, light and dark mode
-src/config.js       every number, with source and status
-src/engine.js       the model — customers, meals, ratings, profit (no screen code)
-src/ui.js           screens and controls
-tests/engine.test.js  checks the model (run: node tests/engine.test.js)
+index.html              the page
+css/style.css           layout for phone and computer, light and dark mode
+fonts/                  Geist (SIL Open Font License, see GEIST-OFL.txt)
+src/config.js           every number, with source and status
+src/engine.js           the model: customers, meals, ratings, profit, the student week (no screen code)
+src/icons.js            Phosphor Icons (MIT)
+src/ui.js               screens and controls
+tests/                  tests and audits
 ```
 
 ## Controls
 
 - Phone: tap the buttons.
-- Computer: click, or press **1–4** to serve and **Space** for the next customer.
+- Computer: vendor mode, press 1 to 4 to serve and Space for the next customer. Student mode, Space takes a bite and Enter stops eating.
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE).
+Code: MIT, see [LICENSE](LICENSE). Geist font: SIL Open Font License 1.1. Phosphor Icons: MIT.

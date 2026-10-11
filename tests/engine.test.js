@@ -32,9 +32,20 @@ test('Today never sells a Small plate; Just Right does', () => {
 test('break-even: a Small plate at the break-even discount earns the same profit as a Regular', () => {
   const cfg = fresh();
   cfg.params.discount.value = JR.breakEvenDiscount(cfg);
-  const c = JR.makeCustomers(cfg, 1, 1)[0];
-  const one = a => JR.runDay(cfg, [c], 'justright', [a]).profit;
-  assert.ok(Math.abs(one('small') - one('regular')) < 1e-9);
+  const base = { persona: 'usual', name: 'x', icon: 'repeat', rusher: false, budget: false, tasteRoll: 0.99, sizeRoll: 0 };
+  const smallC = { ...base, appetite: 0.6 }, regC = { ...base, appetite: 1.0 };
+  assert.strictEqual(JR.order(smallC, cfg, 'justright'), 'small');
+  assert.strictEqual(JR.order(regC, cfg, 'justright'), 'regular');
+  const ps = JR.runDay(cfg, [smallC], 'justright', ['small']).profit, pr = JR.runDay(cfg, [regC], 'justright', ['regular']).profit;
+  assert.ok(Math.abs(ps - pr) < 1e-9, ps + ' vs ' + pr);
+});
+
+test('customers pay for the size they ordered, even if served the wrong one', () => {
+  const cfg = fresh();
+  const c = { persona: 'usual', name: 'x', icon: 'repeat', rusher: false, budget: false, tasteRoll: 0.99, sizeRoll: 0, appetite: 0.6 };
+  const m = JR.meal(c, 'regular', cfg, 'justright');
+  assert.strictEqual(m.price, cfg.params.regularPrice.value - cfg.params.discount.value);
+  assert.ok(m.wrongSize);
 });
 
 test('a rusher never eats more than the rush cap', () => {
