@@ -91,5 +91,40 @@ console.log('5. Player mistakes are penalised the way a customer would react');
   ok(m4.stars >= 4 && JR.bubble(m4) === 'Just nice!', 'serving a Usual their Regular is fine');
 }
 
+console.log('6. Big appetites (gym, one meal a day, athletes, late lunch, quiet big eaters)');
+{
+  const cfg = fresh();
+  const bigKeys = Object.keys(cfg.personas).filter(k => cfg.personas[k].bigGroup);
+  ok(bigKeys.length === 5, 'five big-appetite customer types');
+  const w = JR.personaWeights(cfg), tot = w.reduce((a, x) => a + x[1], 0);
+  ok(Math.abs(tot - 1) < 1e-9, 'customer mix adds up to 100%');
+  ok(Math.abs(w.filter(x => bigKeys.includes(x[0])).reduce((a, x) => a + x[1], 0) - cfg.params.shareBig.value) < 1e-9, 'big appetites make up exactly shareBig');
+  const cs = JR.makeCustomers(cfg, 7, 5000), seen = new Set(cs.map(c => c.persona));
+  bigKeys.forEach(k => ok(seen.has(k), `${k} appears in a long day`));
+  const bigShare = cs.filter(c => bigKeys.includes(c.persona)).length / cs.length;
+  ok(Math.abs(bigShare - cfg.params.shareBig.value) < 0.02, `big appetites drawn at about ${cfg.params.shareBig.value} (got ${bigShare.toFixed(3)})`);
+  for (const c of cs.filter(c => bigKeys.includes(c.persona))) {
+    for (const s of ['today', 'justright']) ok(!['small', 'less'].includes(JR.order(c, cfg, s)), `${c.persona} never orders Small or less rice (${s})`);
+    if (c.persona === 'late') ok(c.rusher, 'Late Luncher is always rushed');
+    if (c.persona === 'quietbig' && !c.rusher) {
+      for (const s of ['today', 'justright']) {
+        const reg = JR.meal(c, 'regular', cfg, s), more = JR.meal(c, 'more', cfg, s);
+        ok(reg.fullness === 'hungry' || reg.fullness === 'letdown', `quiet big eater served Regular stays hungry (${s})`);
+        if (!reg.letdown) ok(more.stars > reg.stars && !more.stingy && !more.wrongSize, `spotting a quiet big eater and adding rice is rewarded (${s})`);
+        ok(more.price === reg.price, `adding rice is free (${s})`);
+      }
+    }
+    if (c.persona === 'late' && !JR.meal(c, 'regular', cfg, 'justright').letdown) {
+      const reg = JR.meal(c, 'regular', cfg, 'justright'), sm = JR.meal(c, 'small', cfg, 'justright');
+      ok(reg.leftover > 0 && sm.stars < reg.stars, 'Late Luncher leaves food from time, and a Small plate does not help');
+    }
+  }
+  const d1 = (sb) => { const c2 = fresh(); c2.params.shareBig.value = sb; let gap = 0, prof = 0; for (let s = 1; s <= 200; s++) { const x = JR.makeCustomers(c2, s, 80); const t = JR.runDay(c2, x, 'today'), j = JR.runDay(c2, x, 'justright'); gap += t.leftFood / t.plates - j.leftFood / j.plates; prof += t.profit; } return { gap: gap / 200, prof: prof / 200 }; };
+  const lo = d1(0.1), hi = d1(0.3);
+  ok(hi.gap > 0, 'Just Right still cuts meals with food left at 30% big appetites');
+  ok(hi.prof < lo.prof, 'more big appetites with free Add rice lowers profit');
+  console.log(`   waste gap, Today minus Just Right: ${(lo.gap * 100).toFixed(1)} points at 10% big, ${(hi.gap * 100).toFixed(1)} at 30%`);
+}
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

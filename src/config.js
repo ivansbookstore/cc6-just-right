@@ -26,7 +26,7 @@
       shareLight:     { label: 'Light eaters (leave food: portion too large / not hungry)', value: 65 / 97, unit: '%', source: 'Student survey (97 responses), Q2 + Q4: 65 of 97', status: 'survey' },
       shareNeverLeave:{ label: 'Never leave food', value: 23 / 97, unit: '%', source: 'Student survey (97 responses), Q2: 23 of 97', status: 'survey' },
       sharePicky:     { label: 'Leave food mainly over taste', value: 9 / 97, unit: '%', source: 'Student survey (97 responses), Q2 + Q4: 9 of 97', status: 'survey' },
-      shareBig:       { label: 'Big eaters (added on top, others scaled down)', value: 0.10, unit: '%', min: 0, max: 0.3, step: 0.05, source: 'No survey question asks this', status: 'assumption', editable: true },
+      shareBig:       { label: 'Big appetites (gym, one meal a day, athletes, late lunch, quiet big eaters), added on top, others scaled down', value: 0.20, unit: '%', min: 0, max: 0.4, step: 0.05, source: 'No survey question asks who wants more than a Regular plate. Closest: 11 of 97 say the portion is never too big; 15 of 97 prefer a small plate with a free top-up; vendors worry students will not be full', status: 'assumption', editable: true },
       lightSpeakUp:   { label: 'Light eaters who ask for less rice', value: 0.50, unit: '%', min: 0, max: 1, step: 0.05, source: 'No data. 21 of 97 say they cannot choose their portion', status: 'assumption', editable: true },
       neverLeaveCleanPlater: { label: 'Of those who never leave food, share who finish even when full', value: 0.50, unit: '%', source: 'No data', status: 'assumption' },
       rusherShare:    { label: 'Chance a customer is rushing at this meal', value: 0.10, unit: '%', source: 'No data. 10 of 97 name time as one reason they leave food (not every meal)', status: 'assumption' },
@@ -36,16 +36,22 @@
       tasteLetdownOther: { label: 'Chance the food disappoints anyone else', value: 0.05, unit: '%', source: 'No data. 46 of 97 name taste as one reason they leave food', status: 'assumption' },
       ratingSensitivity: { label: 'Change in tomorrow\'s customers per star of rating difference', value: 0.30, unit: '%', source: 'No data. Illustrates how ratings drive customers', status: 'assumption' },
     },
-    calibration: 'Check against the survey: in the model about 4 in 10 Today meals leave food (39% over 40 simulated days). Our survey of 97 students (23 Never, 23 Rarely, 41 Sometimes, 10 Often, 0 Always) gives about 28% if Rarely means about 15% of meals, Sometimes 40% and Often 70%. That conversion is our assumption, and it suggests the model overstates today\'s waste, and so the waste Just Right saves. The plate-waste photo audit should replace these appetite ranges.',
+    calibration: 'Check against the survey: in the model about 4 in 10 Today meals leave food (38% over 40 simulated days). Our survey of 97 students (23 Never, 23 Rarely, 41 Sometimes, 10 Often, 0 Always) gives about 28% if Rarely means about 15% of meals, Sometimes 40% and Often 70%. That conversion is our assumption, and it suggests the model overstates today\'s waste, and so the waste Just Right saves. The plate-waste photo audit should replace these appetite ranges.',
     personas: {
       light:  { name: 'The Light Eater', icon: 'feather', appetite: [0.80, 1.15], line: 'Auntie, less rice can?', jrLine: 'One Small, please.' },
       quiet:  { name: 'The Quiet One', icon: 'hand-pointing', appetite: [0.80, 1.15], line: '(points at the dish, says nothing)', jrLine: '(points at Small on the board)' },
       usual:  { name: 'The Usual', icon: 'repeat', appetite: [0.95, 1.20], line: 'Same as always.', jrLine: 'Regular, thanks.' },
       clean:  { name: 'The Clean-Plater', icon: 'seal-check', appetite: [0.60, 0.85], line: 'Cannot waste food.', jrLine: 'Regular, thanks.', cleanPlater: true },
       picky:  { name: 'The Picky One', icon: 'magnifying-glass', appetite: [0.90, 1.10], line: 'Hmm… what\'s good today?', jrLine: 'Regular… I guess.' },
-      big:    { name: 'The Gym Regular', icon: 'barbell', appetite: [1.10, 1.40], line: 'Boss, add rice please!', jrLine: 'Regular, add rice please!' },
+      // big appetites: shareBig is split across these five equally (assumption). asks: what they order; quietMore: hungry but will not ask.
+      big:    { name: 'The Gym Regular', icon: 'barbell', appetite: [1.10, 1.40], line: 'Boss, add rice please!', jrLine: 'Regular, add rice please!', bigGroup: true, asks: 'more' },
+      omad:   { name: 'One Meal a Day', icon: 'clock-afternoon', appetite: [1.25, 1.50], line: 'Boss, add rice, more gravy can? First meal today.', jrLine: 'Regular, add rice please. First meal today.', bigGroup: true, asks: 'more' },
+      athlete:{ name: 'The Hall Athlete', icon: 'basketball', appetite: [1.20, 1.45], line: 'Just finished training. Add rice please!', jrLine: 'Regular, add rice please. Just finished training!', bigGroup: true, asks: 'more' },
+      late:   { name: 'The Late Luncher', icon: 'person-simple-run', appetite: [1.15, 1.35], line: 'Starving, but class at 2:30. Normal one, fast please!', jrLine: 'Regular, fast please. Class at 2:30!', bigGroup: true, asks: 'regular', alwaysRusher: true },
+      quietbig:{ name: 'The Quiet Big Eater', icon: 'bowl-steam', appetite: [1.20, 1.40], line: '(points at the dish, eyes the rice pot)', jrLine: '(points at Regular, eyes the rice pot)', bigGroup: true, asks: 'regular', quietMore: true },
     },
     traitLines: { rusher: 'Fast fast, got class at 2!', budget: 'Got cheaper one?' },
+    bigLabel: 'Big appetites',
     // ---------- student mode. Stall types come from the group's game brief; their portions, prices, queues and ratings are assumptions.
     // The Standard and Just Right use the vendor settings above (Regular plate, Small plate, discount), so both modes agree.
     student: {

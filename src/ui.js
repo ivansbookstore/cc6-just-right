@@ -756,7 +756,7 @@
       const keys = Object.keys(ps).filter(k => ps[k].status === st);
       return `<div class="paramgroup"><h3><span class="status ${st}">${keys.length}</span>${title}</h3><p class="muted small" style="margin-top:0">${sub}</p>${keys.map(paramRow).join('')}</div>`;
     }).join('');
-    const pers = Object.values(cfg.personas).map(p => `<li>${I(p.icon)} <b>${esc(p.name)}</b> wants ${pct(p.appetite[0])} to ${pct(p.appetite[1])} of a Regular plate${p.cleanPlater ? ' and finishes everything' : ''}.</li>`).join('');
+    const pers = Object.values(cfg.personas).map(p => `<li>${I(p.icon)} <b>${esc(p.name)}</b> wants ${pct(p.appetite[0])} to ${pct(p.appetite[1])} of a Regular plate${p.cleanPlater ? ' and finishes everything' : ''}${p.quietMore ? ', orders Regular and never asks for more' : ''}${p.alwaysRusher ? ', always short of time' : ''}${p.asks === 'more' ? ', asks for more rice' : ''}.</li>`).join('');
     const w = JR.personaWeights(cfg).map(([k, x]) => `${cfg.personas[k].name} ${pct(x)}`).join(', ');
     $('#how-body').innerHTML = `
       <h1 style="font-size:clamp(32px,5vw,46px);margin-top:8px">How this works</h1>
@@ -771,7 +771,8 @@
         </div>
         <div class="card">
           <h2>The customers</h2>
-          <p class="small muted">Mix from our survey, with big eaters added: ${esc(w)}.</p>
+          <p class="small muted">Mix from our survey, with big appetites added on top (${pct(P('shareBig'))} in all, split equally, an assumption): ${esc(w)}.</p>
+          <p class="small muted">"Add rice" is free, as vendors do today, so it costs the vendor rice. Big appetites never order Small. The Late Luncher leaves food because of time, whatever the plate size.</p>
           <ul class="plain small">${pers}</ul>
         </div>
       </div>

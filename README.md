@@ -15,7 +15,7 @@ Because both settings use exactly the same customers, any difference comes from 
 
 ## Two modes
 
-**Be the vendor.** Serve a 20-customer lunch rush at an economy rice stall. Each customer has a hidden appetite and a line of speech; you choose how to serve them before they lose patience. The closing report compares Today and Just Right for a full day of 80 plates (environment, society, economy), shows what your own play did, and runs a three-day "shortcut" where the vendor quietly shrinks every plate, to show how ratings drop.
+**Be the vendor.** Serve a 20-customer lunch rush at an economy rice stall. Each customer has a hidden appetite and a line of speech (light eaters, quiet ones, clean-platers, picky eaters, and about 1 in 5 with a big appetite: the Gym Regular, One Meal a Day, the Hall Athlete, the Late Luncher and the Quiet Big Eater, who never asks for more); you choose how to serve them before they lose patience. The closing report compares Today and Just Right for a full day of 80 plates (environment, society, economy), shows what your own play did, and runs a three-day "shortcut" where the vendor quietly shrinks every plate, to show how ratings drop.
 
 **Be the student.** Answer three questions (our survey question on whether the standard portion is too big for you, how often you eat breakfast, your weekly budget), then eat lunch Monday to Friday. Pick a stall, eat bite by bite while a hunger bar fills, and stop when you like. Stopping too early leaves you hungry; finishing a big plate can leave you stuffed in a 2 pm lecture; leaving rice wastes food. Then replay the same week with a Small plate at the Just Right stall and compare.
 

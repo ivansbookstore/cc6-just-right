@@ -24,7 +24,9 @@
     const big = v(cfg, 'shareBig'), scale = 1 - big;
     const light = v(cfg, 'shareLight') * scale, never = v(cfg, 'shareNeverLeave') * scale, picky = v(cfg, 'sharePicky') * scale;
     const sp = v(cfg, 'lightSpeakUp'), cp = v(cfg, 'neverLeaveCleanPlater');
-    return [['light', light * sp], ['quiet', light * (1 - sp)], ['clean', never * cp], ['usual', never * (1 - cp)], ['picky', picky], ['big', big]];
+    const bigKeys = Object.keys(cfg.personas).filter(k => cfg.personas[k].bigGroup);
+    return [['light', light * sp], ['quiet', light * (1 - sp)], ['clean', never * cp], ['usual', never * (1 - cp)], ['picky', picky],
+      ...bigKeys.map(k => [k, big / bigKeys.length])];
   }
 
   // ---------- customers: everything random is drawn here, once, so both settings see identical people
@@ -38,7 +40,7 @@
       const appetite = p.appetite[0] + r() * (p.appetite[1] - p.appetite[0]);
       out.push({
         id: i + 1, persona: key, name: p.name, icon: p.icon, appetite,
-        rusher: key !== 'clean' && r() < v(cfg, 'rusherShare'),
+        rusher: key !== 'clean' && (r() < v(cfg, 'rusherShare') || !!p.alwaysRusher),
         budget: r() < v(cfg, 'budgetShare'),
         tasteRoll: r(), sizeRoll: r(),
       });
@@ -47,16 +49,17 @@
   }
 
   // ---------- what the customer asks for
+  const asksMore = (c, cfg) => cfg.personas[c.persona].asks === 'more';
+  const isBigGroup = (c, cfg) => !!cfg.personas[c.persona].bigGroup;
   function order(c, cfg, setting) {
+    if (isBigGroup(c, cfg)) return asksMore(c, cfg) ? 'more' : 'regular';   // big appetites never pick Small or less rice
     if (setting === 'justright') {
-      if (c.persona === 'big') return 'more';
       const cut = v(cfg, 'smallShare') / 0.85;              // Small still leaves them "just right" (not hungry)
       const fitsSmall = c.appetite <= cut || (c.budget && c.appetite <= 0.95);   // budget-minded stretch to Small a little further
       const nearLine = Math.abs(c.appetite - cut) < 0.15;     // only people near the line pick the wrong size
       const right = !nearLine || c.sizeRoll < v(cfg, 'chooseRightSize');
       return (fitsSmall === right) ? 'small' : 'regular';
     }
-    if (c.persona === 'big') return 'more';
     if (c.persona === 'light' && c.appetite <= v(cfg, 'lessRiceShare') / 0.85) return 'less';   // only asks when less still leaves them full
     return 'regular';                                       // today and shortcut: no size choice
   }
@@ -67,7 +70,7 @@
     if (setting === 'justright' && order(c, cfg, setting) === 'regular' && (c.persona === 'light')) line = 'Regular, please.';
     if (setting === 'justright' && order(c, cfg, setting) === 'regular' && c.persona === 'quiet') line = '(points at Regular on the board)';
     if (setting !== 'justright' && c.persona === 'light' && order(c, cfg, setting) === 'regular') line = 'Normal portion, thanks.';
-    if (c.rusher) line += ' ' + cfg.traitLines.rusher;
+    if (c.rusher && !p.alwaysRusher) line += ' ' + cfg.traitLines.rusher;
     if (c.budget && setting !== 'justright') line += ' ' + cfg.traitLines.budget;
     return line;
   }
@@ -79,7 +82,7 @@
     shortcut: [['shrink', 'Regular (shrunk)']],
   };
   function standardAction(c, cfg, setting) {
-    if (setting === 'shortcut') return c.persona === 'big' ? 'more' : 'shrink';
+    if (setting === 'shortcut') return asksMore(c, cfg) ? 'more' : 'shrink';
     const o = order(c, cfg, setting);
     if (o === 'less') return v(cfg, 'todayLessResponse');
     return o;                                               // regular / small / more
@@ -127,7 +130,8 @@
     const ignored = asked === 'less' && (action === 'regular' || action === 'more');   // asked for less rice, did not get it
     if (ignored) { stars -= 0.5; notes.push('ignored'); }
     stars = clamp(stars, 1, 5);
-    return { served, eaten, leftover, price, extraCost, fullness, stars, stingy, wrongSize, ignored, asked, action, letdown };
+    const quietMore = !!cfg.personas[c.persona].quietMore;
+    return { served, eaten, leftover, price, extraCost, fullness, stars, stingy, wrongSize, ignored, asked, action, letdown, quietMore };
   }
 
   function bubble(m) {
@@ -136,7 +140,8 @@
     if (m.ignored) return 'I said less rice leh.';
     if (m.fullness === 'letdown') return 'Hmm… not what I expected.';
     if (m.fullness === 'rushed') return 'No time to finish, gotta run!';
-    if (m.fullness === 'hungry') return 'Still hungry…';
+    if (m.fullness === 'hungry') return m.quietMore ? '(still hungry, but says nothing)' : 'Still hungry…';
+    if (m.quietMore && m.action === 'more') return '(nods, clears the plate)';
     if (m.fullness === 'stuffed') return 'So full… food coma incoming.';
     if (m.leftover > 15) return 'Too much rice lah.';
     return 'Just nice!';
