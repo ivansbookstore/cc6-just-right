@@ -28,7 +28,10 @@
   }
   const P = k => cfg.params[k].value;
 
-  const S = { setting: 'today', seed: 20261012, all: [], rush: [], actions: [], idx: 0, timer: null, left: 0, prev: 'start', showing: false, nextTimer: null };
+  // a new queue every game: ?seed=123 in the address replays a given queue
+  const newSeed = () => { try { return crypto.getRandomValues(new Uint32Array(1))[0] >>> 0; } catch (e) { return Math.floor(Math.random() * 4294967295); } };
+  const urlSeed = (() => { try { const x = parseInt(new URLSearchParams(location.search).get('seed'), 10); return isFinite(x) ? x >>> 0 : null; } catch (e) { return null; } })();
+  const S = { setting: 'today', seed: urlSeed != null ? urlSeed : newSeed(), all: [], rush: [], actions: [], idx: 0, timer: null, left: 0, prev: 'start', showing: false, nextTimer: null };
 
   // ---------- small pieces
   function stars(r) {
@@ -116,6 +119,15 @@
   $('#back-home').innerHTML = I('arrow-left') + 'Home';
   $('#back-how').innerHTML = I('arrow-left') + 'Back';
 
+  // ---------- build label, bottom right. If the page and the scripts disagree, the browser is showing an old cached copy.
+  (() => {
+    const meta = document.querySelector('meta[name="jr-build"]'), page = meta ? meta.content : '?', js = cfg.build || '?';
+    const el = document.createElement('div'); el.className = 'build'; el.setAttribute('aria-label', 'Build version');
+    el.textContent = page === js ? `Build ${js}` : `Build ${page} / scripts ${js}: refresh`;
+    if (page !== js) el.classList.add('stale');
+    document.body.appendChild(el);
+  })();
+
   // ---------- live preview on the start screen: one real customer from the model, served both ways
   function renderPreview() {
     const cs = JR.makeCustomers(cfg, S.seed, 80);
@@ -190,7 +202,11 @@
 
   // ---------- rush
   function startRush(sameCustomers) {
-    if (!sameCustomers) S.all = JR.makeCustomers(cfg, S.seed, P('platesPerDay'));
+    if (!sameCustomers) {
+      if (S.played && urlSeed == null) S.seed = newSeed();    // fresh customers every new game; replays keep the same queue
+      S.played = true;
+      S.all = JR.makeCustomers(cfg, S.seed, P('platesPerDay'));
+    }
     S.rush = S.all.slice(0, P('rushCustomers'));
     S.actions = []; S.idx = 0; S.showing = false;
     go('rush'); renderRush(); startTimer();
@@ -198,10 +214,11 @@
   function stopTimers() { clearInterval(S.timer); clearTimeout(S.nextTimer); S.timer = null; }
   function startTimer() {
     stopTimers();
-    S.left = P('patienceSec');
+    const c0 = S.rush[S.idx], full = P('patienceSec') * ((c0 && c0.patience) || 1);
+    S.left = full;
     S.timer = setInterval(() => {
       S.left -= 0.1;
-      const frac = Math.max(0, S.left / P('patienceSec'));
+      const frac = Math.max(0, S.left / full);
       const el = $('#patience');
       if (el) { el.firstElementChild.style.width = (frac * 100) + '%'; el.classList.toggle('low', frac < 0.3); }
       if (S.left <= 0) serve(null);
@@ -218,13 +235,13 @@
     $('#hud-cash').textContent = money(so.revenue);
     const next = S.rush.slice(S.idx + 1, S.idx + 6);
     $('#queue').innerHTML = `<span class="lbl">${next.length ? 'Next' : 'Last customer'}</span>` +
-      next.map(q => `<span class="qp" title="${esc(q.name)}">${I(cfg.personas[q.persona].icon)}</span>`).join('');
+      next.map(q => `<span class="qp" title="${esc((q.first ? q.first + ', ' : '') + q.name)}">${I(cfg.personas[q.persona].icon)}</span>`).join('');
     const traits = [];
     if (c.rusher) traits.push(I('timer') + 'In a rush');
     if (c.budget) traits.push(I('coins') + 'Budget-minded');
     const cust = $('#customer');
     cust.innerHTML = `<div class="avatar">${I(cfg.personas[c.persona].icon)}</div>
-      <div class="name">${esc(c.name)}</div>
+      <div class="name">${esc(c.first || c.name)}</div>${c.first ? `<div class="ptype">${esc(c.name)}</div>` : ''}
       <div class="traits">${traits.map(t => `<span class="trait">${t}</span>`).join('')}</div>
       <div class="speech">“${esc(JR.lineFor(c, cfg, set))}”</div>
       <div class="patience" id="patience" role="progressbar" aria-label="Patience"><div></div></div>`;
@@ -260,7 +277,7 @@
     cust.classList.remove('enter'); cust.classList.add('leaving');
     let html, after;
     if (action === null) {
-      html = `<div class="avatar gone">${I('person-simple-walk')}</div><div class="bub">${esc(c.name)} walked away.</div>
+      html = `<div class="avatar gone">${I('person-simple-walk')}</div><div class="bub">${esc(c.first || c.name)} walked away.</div>
         <p class="muted">Lost sale. The queue was too slow.</p>`;
       SND.play('walk');
       after = () => { floatText($('#hud-rating'), 'Lost sale', true); };
@@ -421,9 +438,10 @@
         <button class="btn-ic" id="r-new">${I('calendar-plus')}New day</button>
         <button class="btn-ic" data-go="how">${I('question')}How this works</button>
         <button class="btn-ic" data-go="start">${I('house')}Home</button>
-      </div>`;
+      </div>
+      <p class="muted small" style="margin-top:10px">Queue number ${S.seed}. "New day" brings a fresh queue; "Replay" keeps these customers.</p>`;
     $('#r-same').addEventListener('click', () => { S.setting = other; startRush(true); });
-    $('#r-new').addEventListener('click', () => { S.seed += 1; go('setup'); });
+    $('#r-new').addEventListener('click', () => go('setup'));
     go('report');
     SND.play('fanfare');
     countUp($('#report-body'));

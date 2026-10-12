@@ -44,6 +44,12 @@
         budget: r() < v(cfg, 'budgetShare'),
         tasteRoll: r(), sizeRoll: r(),
       });
+      // look and feel only (drawn last so they never change who eats what): name, which line they say, patience
+      const o = out[out.length - 1], names = cfg.names || [], sp = cfg.patienceSpread || [1, 1];
+      o.first = names.length ? names[Math.floor(r() * names.length)] : '';
+      o.lineRoll = r();
+      const pr = r(), lo = sp[0], hi = o.rusher ? (sp[0] + sp[1]) / 2 : sp[1];
+      o.patience = lo + pr * (hi - lo);
     }
     return out;
   }
@@ -63,15 +69,18 @@
     if (c.persona === 'light' && c.appetite <= v(cfg, 'lessRiceShare') / 0.85) return 'less';   // only asks when less still leaves them full
     return 'regular';                                       // today and shortcut: no size choice
   }
+  // pick one of several lines with the customer's own roll, so the same customer always says the same thing
+  const pick = (x, roll) => Array.isArray(x) ? x[Math.min(x.length - 1, Math.floor((roll || 0) * x.length))] : x;
   function lineFor(c, cfg, setting) {
-    const p = cfg.personas[c.persona];
-    let line = setting === 'justright' ? p.jrLine : p.line;
-    if (setting === 'justright' && order(c, cfg, setting) === 'small' && c.persona !== 'quiet') line = 'One Small, please.';
-    if (setting === 'justright' && order(c, cfg, setting) === 'regular' && (c.persona === 'light')) line = 'Regular, please.';
-    if (setting === 'justright' && order(c, cfg, setting) === 'regular' && c.persona === 'quiet') line = '(points at Regular on the board)';
-    if (setting !== 'justright' && c.persona === 'light' && order(c, cfg, setting) === 'regular') line = 'Normal portion, thanks.';
-    if (c.rusher && !p.alwaysRusher) line += ' ' + cfg.traitLines.rusher;
-    if (c.budget && setting !== 'justright') line += ' ' + cfg.traitLines.budget;
+    const p = cfg.personas[c.persona], ol = cfg.orderLines || {}, roll = c.lineRoll;
+    let line = pick(setting === 'justright' ? p.jrLine : p.line, roll);
+    const o = order(c, cfg, setting);
+    if (setting === 'justright' && o === 'small' && c.persona !== 'quiet') line = pick(ol.small || 'One Small, please.', roll);
+    if (setting === 'justright' && o === 'regular' && c.persona === 'light') line = pick(ol.regular || 'Regular, please.', roll);
+    if (setting === 'justright' && o === 'regular' && c.persona === 'quiet') line = pick(ol.quietRegular || '(points at Regular on the board)', roll);
+    if (setting !== 'justright' && c.persona === 'light' && o === 'regular') line = pick(ol.normalToday || 'Normal portion, thanks.', roll);
+    if (c.rusher && !p.alwaysRusher) line += ' ' + pick(cfg.traitLines.rusher, roll);
+    if (c.budget && setting !== 'justright') line += ' ' + pick(cfg.traitLines.budget, roll);
     return line;
   }
 

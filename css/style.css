@@ -309,3 +309,10 @@ fieldset.quiz legend { font-weight: 600; margin-bottom: 8px; padding: 0; }
 @media (prefers-reduced-motion: no-preference) {
   .sbars.grow-in .sbar i { transform-origin: left center; animation: grow .6s var(--ease) both; }
 }
+
+/* ---------- customer type under the name, build label */
+.customer .ptype { font-size: 13px; color: var(--muted); margin-top: -2px; }
+.build { position: fixed; right: 10px; bottom: 8px; z-index: 5; font-size: 11px; font-weight: 560; color: var(--muted); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-tag); padding: 2px 9px; opacity: .85; pointer-events: none; font-variant-numeric: tabular-nums; }
+.build.stale { color: var(--accent-ink); background: #b4532a; border-color: #b4532a; opacity: 1; }
+footer { padding-bottom: 40px; }

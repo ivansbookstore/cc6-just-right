@@ -31,6 +31,8 @@ Every number lives in [`src/config.js`](src/config.js) with its source and a sta
 
 Change a value there, or on the in-game "How this works" screen, and both modes follow. Results are a simulation under stated assumptions, not real sales or waste data. All student-mode stall prices, portions, queues and ratings are assumptions for the game.
 
+Every new game draws a fresh queue of customers (names, lines and patience vary too). Add `?seed=123` to the address to replay a particular queue. The build number sits in the bottom-right corner; if it says "refresh", the browser is mixing an old cached copy with the new page.
+
 ## Checks
 
 ```

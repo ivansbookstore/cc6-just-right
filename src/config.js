@@ -6,6 +6,7 @@
 (function (root) {
   const CONFIG = {
     version: '0.1 (MVP)',
+    build: '0.6',                       // shown bottom-right; bump with every push so a stale cache is easy to spot
     params: {
       regularRiceG:   { label: 'Rice/noodles in a Regular plate', value: 200, unit: 'g', min: 150, max: 260, step: 10, source: 'Vendor survey, portion question (answers ~150-250 g)', status: 'vendor' },
       smallShare:     { label: 'Small plate as a share of Regular', value: 0.70, unit: '%', min: 0.5, max: 0.9, step: 0.05, source: 'Group decision, to test in the pilot', status: 'assumption', editable: true },
@@ -38,11 +39,11 @@
     },
     calibration: 'Check against the survey: in the model about 4 in 10 Today meals leave food (38% over 40 simulated days). Our survey of 97 students (23 Never, 23 Rarely, 41 Sometimes, 10 Often, 0 Always) gives about 28% if Rarely means about 15% of meals, Sometimes 40% and Often 70%. That conversion is our assumption, and it suggests the model overstates today\'s waste, and so the waste Just Right saves. The plate-waste photo audit should replace these appetite ranges.',
     personas: {
-      light:  { name: 'The Light Eater', icon: 'feather', appetite: [0.80, 1.15], line: 'Auntie, less rice can?', jrLine: 'One Small, please.' },
-      quiet:  { name: 'The Quiet One', icon: 'hand-pointing', appetite: [0.80, 1.15], line: '(points at the dish, says nothing)', jrLine: '(points at Small on the board)' },
-      usual:  { name: 'The Usual', icon: 'repeat', appetite: [0.95, 1.20], line: 'Same as always.', jrLine: 'Regular, thanks.' },
-      clean:  { name: 'The Clean-Plater', icon: 'seal-check', appetite: [0.60, 0.85], line: 'Cannot waste food.', jrLine: 'Regular, thanks.', cleanPlater: true },
-      picky:  { name: 'The Picky One', icon: 'magnifying-glass', appetite: [0.90, 1.10], line: 'Hmm… what\'s good today?', jrLine: 'Regular… I guess.' },
+      light:  { name: 'The Light Eater', icon: 'feather', appetite: [0.80, 1.15], line: ['Auntie, less rice can?', 'Less rice please, cannot finish one.', 'Small bit of rice only, thanks.'], jrLine: ['One Small, please.', 'Small one, thanks.', 'Can I get the Small?'] },
+      quiet:  { name: 'The Quiet One', icon: 'hand-pointing', appetite: [0.80, 1.15], line: ['(points at the dish, says nothing)', '(points, nods, looks at phone)', '(taps the glass at the dish)'], jrLine: ['(points at Small on the board)', '(taps Small on the board)', '(points at the Small price)'] },
+      usual:  { name: 'The Usual', icon: 'repeat', appetite: [0.95, 1.20], line: ['Same as always.', 'The usual, boss.', 'Normal one, thanks.'], jrLine: ['Regular, thanks.', 'Regular one.', 'Same as always, Regular.'] },
+      clean:  { name: 'The Clean-Plater', icon: 'seal-check', appetite: [0.60, 0.85], line: ['Cannot waste food.', 'Whatever you give, I finish.', 'Normal can, I always clear my plate.'], jrLine: ['Regular, thanks.', 'Regular, I always finish.', 'Regular one, please.'], cleanPlater: true },
+      picky:  { name: 'The Picky One', icon: 'magnifying-glass', appetite: [0.90, 1.10], line: ["Hmm… what's good today?", 'Is this one nice ah?', 'Hmm… OK lah, this one.'], jrLine: ['Regular… I guess.', 'Hmm, Regular then.', 'Regular, hope it is good today.'] },
       // big appetites: shareBig is split across these five equally (assumption). asks: what they order; quietMore: hungry but will not ask.
       big:    { name: 'The Gym Regular', icon: 'barbell', appetite: [1.10, 1.40], line: 'Boss, add rice please!', jrLine: 'Regular, add rice please!', bigGroup: true, asks: 'more' },
       omad:   { name: 'One Meal a Day', icon: 'clock-afternoon', appetite: [1.25, 1.50], line: 'Boss, add rice, more gravy can? First meal today.', jrLine: 'Regular, add rice please. First meal today.', bigGroup: true, asks: 'more' },
@@ -50,7 +51,14 @@
       late:   { name: 'The Late Luncher', icon: 'person-simple-run', appetite: [1.15, 1.35], line: 'Starving, but class at 2:30. Normal one, fast please!', jrLine: 'Regular, fast please. Class at 2:30!', bigGroup: true, asks: 'regular', alwaysRusher: true },
       quietbig:{ name: 'The Quiet Big Eater', icon: 'bowl-steam', appetite: [1.20, 1.40], line: '(points at the dish, eyes the rice pot)', jrLine: '(points at Regular, eyes the rice pot)', bigGroup: true, asks: 'regular', quietMore: true },
     },
-    traitLines: { rusher: 'Fast fast, got class at 2!', budget: 'Got cheaper one?' },
+    traitLines: { rusher: ['Fast fast, got class at 2!', 'Quick ah, lecture starting.', 'Rushing, sorry!'], budget: ['Got cheaper one?', 'Cheapest one can?', 'Anything cheaper?'] },
+    // what a light eater says when the order differs from their usual line
+    orderLines: { small: ['One Small, please.', 'Small one, thanks.', 'Can I get the Small?'], regular: ['Regular, please.', 'Regular one, thanks.', 'Regular.'],
+      quietRegular: ['(points at Regular on the board)', '(taps Regular on the board)'], normalToday: ['Normal portion, thanks.', 'Normal one.', 'This one, normal.'] },
+    // first names are drawn at random, independent of customer type. Fictional customers.
+    names: ['Wei Ming', 'Jia Hui', 'Aisyah', 'Arjun', 'Hafiz', 'Priya', 'Jun Jie', 'Nurul', 'Kai Xuan', 'Divya', 'Ryan', 'Mei Ling', 'Farhan', 'Shu Ting', 'Rahul', 'Siti', 'Marcus', 'Xin Yi', 'Imran', 'Kavya',
+      'Zhi Hao', 'Hui Min', 'Daniel', 'Amirah', 'Ethan', 'Yi Ting', 'Haziq', 'Sneha', 'Bryan', 'Wen Qi', 'Irfan', 'Meera', 'Javier', 'Pei Shan', 'Danish', 'Ananya', 'Sean', 'Li Ting', 'Faris', 'Rachel'],
+    patienceSpread: [0.75, 1.30],       // each customer's patience, times the patience setting. Rushers get the bottom half. Game difficulty, not data.
     bigLabel: 'Big appetites',
     // ---------- student mode. Stall types come from the group's game brief; their portions, prices, queues and ratings are assumptions.
     // The Standard and Just Right use the vendor settings above (Regular plate, Small plate, discount), so both modes agree.
