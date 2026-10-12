@@ -231,8 +231,10 @@
     return cfg.student.stalls.map(x => {
       const g = x.share === 'regular' ? R : Math.round(R * x.share);
       const price = x.price === 'regular' ? P : x.price;
-      const options = [{ size: 'regular', label: x.hasSmall && weekNo >= 2 ? 'Regular' : 'One size', g, price }];
-      if (x.hasSmall && weekNo >= 2) options.push({ size: 'small', label: 'Small', g: Math.round(R * v(cfg, 'smallShare')), price: round2(P - v(cfg, 'discount')) });
+      // week 2: Just Right across the whole canteen. Every stall adds a Small: its own plate cut by the Small share, its own price less the discount.
+      const jr = weekNo >= 2;
+      const options = [{ size: 'regular', label: jr ? 'Regular' : 'One size', g, price }];
+      if (jr) options.push({ size: 'small', label: 'Small', g: Math.round(g * v(cfg, 'smallShare')), price: round2(Math.max(1, price - v(cfg, 'discount'))) });
       // like the vendor game: at a normal-price stall you can ask for more rice at the same price
       if (x.share === 'regular') options.push({ size: 'more', label: 'Add rice', g: Math.round(R * v(cfg, 'addRiceShare')), price });
       return { ...x, options };

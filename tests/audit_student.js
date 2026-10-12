@@ -39,14 +39,19 @@ console.log('2. Stalls');
 {
   const s1 = JR.studentStalls(cfg, 1), s2 = JR.studentStalls(cfg, 2);
   ok(s1.every(s => s.options.every(o => o.size !== 'small')), 'week 1: no stall sells a Small plate');
-  const jr2 = s2.find(s => s.id === 'justright');
-  ok(jr2.options.some(o => o.size === 'small') && jr2.options.some(o => o.size === 'regular'), 'week 2: Just Right sells Regular and Small');
+  ok(s2.every(s => s.options.some(o => o.size === 'small') && s.options.some(o => o.size === 'regular')), 'week 2: every stall sells Regular and Small (Just Right canteen-wide)');
   ok(s1.filter(s => s.share === 'regular').every(s => s.options.some(o => o.size === 'more' && o.price === P)), 'normal-price stalls let you add rice at the same price, as in vendor mode');
-  const small = jr2.options.find(o => o.size === 'small');
-  ok(small.g === Math.round(R * cfg.params.smallShare.value) && Math.abs(small.price - (P - cfg.params.discount.value)) < 1e-9, 'Small plate matches the vendor settings');
-  const std = s1.find(s => s.id === 'standard').options[0], jr1 = s1.find(s => s.id === 'justright').options[0];
-  ok(std.g === R && std.price === P && jr1.g === R && jr1.price === P, 'The Standard and Just Right Regular match the vendor Regular plate');
-  ok(s2.filter(s => s.id !== 'justright').every(s => JSON.stringify(s) === JSON.stringify(s1.find(x => x.id === s.id))), 'only Just Right changes in week 2');
+  for (const st of s2) {
+    const reg = st.options.find(o => o.size === 'regular'), sm = st.options.find(o => o.size === 'small');
+    ok(sm.g === Math.round(reg.g * cfg.params.smallShare.value), `${st.id}: Small is the Small share of its own plate (${sm.g} g of ${reg.g} g)`);
+    ok(sm.price < reg.price && sm.price >= 1 && Math.abs(sm.price - Math.max(1, reg.price - cfg.params.discount.value)) < 1e-9, `${st.id}: Small costs the discount less (S$${sm.price.toFixed(2)})`);
+    const w1 = s1.find(x => x.id === st.id).options.find(o => o.size === 'regular');
+    ok(w1.g === reg.g && w1.price === reg.price, `${st.id}: Regular plate unchanged between weeks`);
+  }
+  const stdSmall = s2.find(s => s.id === 'standard').options.find(o => o.size === 'small');
+  ok(stdSmall.g === Math.round(R * cfg.params.smallShare.value) && Math.abs(stdSmall.price - (P - cfg.params.discount.value)) < 1e-9, `The Standard's Small matches the vendor Small plate (${stdSmall.g} g)`);
+  const std = s1.find(s => s.id === 'standard').options[0];
+  ok(std.g === R && std.price === P, 'The Standard Regular matches the vendor Regular plate');
 }
 
 console.log('3. One lunch and its afternoon');
@@ -81,7 +86,7 @@ const strategies = {
   'Standard, best size, stop when full': (day, stalls) => { const s = stalls.find(x => x.id === 'standard'); const b = JR.bestFit(cfg, day, s); return { stallId: s.id, size: b.option.size, eatenG: snap(b.eaten) }; },
   'Uncle Generous, finish the plate': (day, stalls) => pick(stalls, 'generous', 'regular', o => o.g),
   'Small and Cheap, finish the plate':(day, stalls) => pick(stalls, 'smallcheap', 'regular', o => o.g),
-  'Just Right, best size, stop when full': (day, stalls) => { const s = stalls.find(x => x.id === 'justright'); const b = JR.bestFit(cfg, day, s); return { stallId: s.id, size: b.option.size, eatenG: snap(b.eaten) }; },
+  'Just Right, best size, stop when full': (day, stalls) => { const s = stalls.find(x => x.id === 'standard'); const b = JR.bestFit(cfg, day, s); return { stallId: s.id, size: b.option.size, eatenG: snap(b.eaten) }; },
 };
 const snap = g => Math.round(g / cfg.student.biteG) * cfg.student.biteG;   // the player eats in bites
 function pick(stalls, id, size, eat) { const s = stalls.find(x => x.id === id); const o = s.options.find(x => x.size === size) || s.options[0]; return { stallId: id, size: o.size, eatenG: snap(eat(o)) }; }
@@ -123,6 +128,13 @@ console.log('4. Simulated players: every appetite (old set-up and survey Q5 answ
     ok(jr.right >= base.right, `${a}/${h}/S$${b}: Just Right is never less often just right`);
     ok(jr.spent <= base.spent + 1e-9, `${a}/${h}/S$${b}: Just Right never costs more`);
     if (a === 'big' || pr.appetite >= 1.2) ok(jr.leftG === base.leftG && jr.right === base.right, `${a}/${h}/S$${b}: big eaters gain nothing from Small (they buy Regular or Add rice)`);
+    // canteen-wide: at every stall, picking the best size in week 2 never wastes more or costs more than week 1
+    for (const st of JR.studentStalls(cfg, 1).map(x => x.id)) {
+      // money set aside here (a broke player falls back to the cheapest plate anywhere, which is a different test)
+      const best = (wk) => play({ ...pr, budget: 999 }, wk, (day, stalls) => { const s = stalls.find(x => x.id === st); const bf = JR.bestFit(cfg, day, s); return { stallId: st, size: bf.option.size, eatenG: snap(bf.eaten) }; });
+      const r1 = best(1), r2 = best(2);
+      ok(r2.leftG <= r1.leftG + 1e-9 && r2.spent <= r1.spent + 1e-9, `${a}/${h}/S$${b} ${st}: two sizes never waste or cost more`);
+    }
     const skipW = JR.runStudentWeek(cfg, pr, 1, [0, 1, 2, 3, 4].map(() => ({ stallId: 'skip', size: 'none', eatenG: 0 })));
     ok(skipW.spent <= b && skipW.hungry === 5 && skipW.leftG === 0, `${a}/${h}/S$${b}: skipping every lunch is handled`);
     if (b === 40) rows.push([a, h, ...Object.values(res).map(r => `${r.leftMeals}/5 left, ${Math.round(r.leftG)} g, ${r.right} right, ${r.stuffed} stuffed, ${r.hungry} hungry, S$${r.spent.toFixed(2)}`)]);

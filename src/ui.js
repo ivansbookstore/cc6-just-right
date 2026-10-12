@@ -11,21 +11,13 @@
   const SEMESTER_DAYS = 5 * 13;
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // ---------- settings: start from config, keep the player's edits on this device only
+  // ---------- settings: every visit starts from our defaults. Slider changes last until the page is reloaded,
+  // so one Showcase visitor's settings never carry over to the next. (Older builds saved them; clear that copy.)
   const STORE = 'jr-params-v1';
   const freshCfg = () => JSON.parse(JSON.stringify(window.JR_CONFIG));
   let cfg = freshCfg();
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORE) || '{}');
-    for (const k in saved) if (cfg.params[k]) cfg.params[k].value = saved[k];
-  } catch (e) { /* storage blocked: defaults are fine */ }
-  function saveParams() {
-    try {
-      const out = {};
-      for (const k in cfg.params) if (cfg.params[k].value !== window.JR_CONFIG.defaults[k].value) out[k] = cfg.params[k].value;
-      localStorage.setItem(STORE, JSON.stringify(out));
-    } catch (e) { /* ignore */ }
-  }
+  try { localStorage.removeItem(STORE); } catch (e) { /* storage blocked: nothing to clear */ }
+  function saveParams() { /* kept for the callers; settings are deliberately not stored */ }
   const P = k => cfg.params[k].value;
 
   // a new queue every game: ?seed=123 in the address replays a given queue
@@ -482,7 +474,7 @@
   const BREAKFAST = { skipped: 'You skipped breakfast, so you are hungrier than usual.', normal: 'You had a normal breakfast.', big: 'You had a big breakfast, so you are less hungry.' };
   function sHud() {
     const d = ST.week[ST.dayIdx];
-    $('#s-hud').innerHTML = `<span class="chip${ST.weekNo === 2 ? ' jr' : ''}">Week ${ST.weekNo}${ST.weekNo === 2 ? ': Just Right has Small' : ''}</span>
+    $('#s-hud').innerHTML = `<span class="chip${ST.weekNo === 2 ? ' jr' : ''}">Week ${ST.weekNo}${ST.weekNo === 2 ? ': every stall has Small' : ''}</span>
       <span class="chip">${d.day}, day ${ST.dayIdx + 1} of 5</span><span class="spacer"></span>
       <span class="chip">${I('coins')}${money(ST.money)} left</span>`;
   }
@@ -619,7 +611,7 @@
     const dayList = r => r.days.map(d => `<tr><td>${d.day.day}</td><td>${esc(d.stall)}${d.size === 'small' ? ', Small' : ''}</td><td class="num">${Math.round(d.meal.left)} g</td><td>${d.meal.fullness === 'right' ? 'Just right' : d.meal.fullness === 'hungry' ? 'Still hungry' : 'Stuffed'}</td></tr>`).join('');
     $('#s-report-body').innerHTML = `
       <div class="report-head"><h1 style="font-size:clamp(32px,5vw,46px)">${w2 ? 'Week 1 against week 2' : 'Your week'}</h1>
-        <p class="lede">${w2 ? 'The same five days. In week 2 the Just Right stall offered a Small plate.' : 'Five lunches. Here is what they added up to.'}</p></div>
+        <p class="lede">${w2 ? 'The same five days. In week 2 every stall offered a Regular and a Small plate.' : 'Five lunches. Here is what they added up to.'}</p></div>
       <div class="card">
         <div class="tablewrap"><table>
           <tr><th></th><th class="num">Week 1</th>${w2 ? '<th class="num">Week 2</th><th class="num">Change</th>' : ''}</tr>
@@ -643,7 +635,7 @@
           <p>Answer some of our real survey questions and see how you compare with ${SV.n} NTU students. Your game week is on there too.</p>
           <button class="primary btn-ic" id="s-stand-card">${I('users')}See where you stand</button>` : `
           <h2>Try the same week again</h2>
-          <p>Same days, same appetite, same budget. This time the Just Right stall also sells a Small plate for ${money(P('regularPrice') - P('discount'))}.</p>
+          <p>Same days, same appetite, same budget. This time Just Right is canteen-wide: every stall sells a Regular and a Small plate. A Small has ${pct(1 - P('smallShare'))} less rice and costs ${money(P('discount'))} less.</p>
           <p class="muted small">Not every leftover is about size. A rushed lunch or a long queue still costs you.</p>`}
         </div>
       </div>
@@ -801,13 +793,13 @@
           <tr><th>Stall</th><th class="num">Plate</th><th class="num">Price</th><th class="num">Queue</th><th class="num">Stars</th></tr>
           ${JR.studentStalls(cfg, 2).map(x => `<tr><td>${esc(x.name)}</td><td class="num">${x.options.map(o => o.g + ' g').join(', ')}</td><td class="num">${x.options.map(o => money(o.price)).join(', ')}</td><td class="num">${x.queueMin} min</td><td class="num">${x.stars.toFixed(1)}</td></tr>`).join('')}
         </table></div>
-        <p class="muted small">All student-mode numbers are assumptions for the game, not survey data. The Standard and Just Right use the vendor settings below, so both modes agree.</p>
+        <p class="muted small">All student-mode numbers are assumptions for the game, not survey data. The Standard uses the vendor Regular plate. In week 2 Just Right is canteen-wide: every stall adds a Small plate with the vendor Small share of its own rice, for the vendor discount less. So both modes agree.</p>
         <h3>Where you stand</h3>
         <p class="small">That screen compares your own answers with ${SV.n} NTU students who answered our Google Form (${esc(SV.collected)}). It shows counts only, with no individual responses, and nothing you tap is saved or sent. Your game week is placed on question 2 by days with food left: 0 Never, 1 Rarely, 2 to 3 Sometimes, 4 Often, 5 Always (our mapping).</p>
       </div>
       <div class="card" style="margin-top:12px">
         <h2>Every number</h2>
-        <p class="muted small">Sliders change the game on this device only.</p>
+        <p class="muted small">Slider changes last until you reload the page. Every new visit starts from these defaults.</p>
         ${groups}
         <button id="reset" class="btn-ic" style="margin-top:12px">${I('arrow-counter-clockwise')}Reset to defaults</button>
       </div>`;
@@ -817,7 +809,7 @@
       $('#hv-' + k).textContent = fmtVal(p); saveParams();
     }));
     $('#reset').addEventListener('click', () => {
-      cfg = freshCfg(); try { localStorage.removeItem(STORE); } catch (e) { /* ignore */ }
+      cfg = freshCfg();
       renderHow();
     });
   }

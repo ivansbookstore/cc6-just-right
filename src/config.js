@@ -6,16 +6,16 @@
 (function (root) {
   const CONFIG = {
     version: '0.1 (MVP)',
-    build: '0.6',                       // shown bottom-right; bump with every push so a stale cache is easy to spot
+    build: '0.7',                       // shown bottom-right; bump with every push so a stale cache is easy to spot
     params: {
       regularRiceG:   { label: 'Rice/noodles in a Regular plate', value: 200, unit: 'g', min: 150, max: 260, step: 10, source: 'Vendor survey, portion question (answers ~150-250 g)', status: 'vendor' },
-      smallShare:     { label: 'Small plate as a share of Regular', value: 0.70, unit: '%', min: 0.5, max: 0.9, step: 0.05, source: 'Group decision, to test in the pilot', status: 'assumption', editable: true },
+      smallShare:     { label: 'Small plate as a share of Regular', value: 0.75, unit: '%', min: 0.5, max: 0.9, step: 0.05, source: 'Group decision (150 g on a 200 g Regular), to test in the pilot', status: 'assumption', editable: true },
       regularPrice:   { label: 'Price of a Regular plate', value: 5.00, unit: 'S$', min: 4, max: 9, step: 0.1, source: 'Vendor survey, price question (S$4.50-8.00)', status: 'vendor', editable: true },
       discount:       { label: 'Small plate discount', value: 0.50, unit: 'S$', min: 0.1, max: 1.5, step: 0.1, source: 'Vendor survey, fair-discount question', status: 'vendor', editable: true },
       riceCostRegular:{ label: 'Rice/noodle cost in a Regular plate', value: 1.50, unit: 'S$', min: 0.3, max: 3, step: 0.1, source: 'Vendor survey, cost question. Answers unclear (rice only, or whole plate?). Confirm.', status: 'vendor', editable: true },
       toppingCost:    { label: 'Cost of everything else on the plate', value: 2.00, unit: 'S$', min: 1, max: 4, step: 0.1, source: 'No data. Does not change the Today vs Just Right difference', status: 'assumption' },
       extraVegCost:   { label: 'Cost of the extra vegetables a vendor adds instead of a discount', value: 0.30, unit: 'S$', min: 0, max: 1, step: 0.05, source: 'No data. Vendors said they add vegetables or meat instead of charging less', status: 'assumption' },
-      lessRiceShare:  { label: '"Less rice" scoop today, as a share of Regular', value: 0.70, unit: '%', min: 0.5, max: 0.9, step: 0.05, source: 'Assumed equal to the Small plate', status: 'assumption' },
+      lessRiceShare:  { label: '"Less rice" scoop today, as a share of Regular', value: 0.75, unit: '%', min: 0.5, max: 0.9, step: 0.05, source: 'Assumed equal to the Small plate', status: 'assumption' },
       addRiceShare:   { label: '"Add rice" plate, as a share of Regular', value: 1.25, unit: '%', min: 1.1, max: 1.5, step: 0.05, source: 'No data', status: 'assumption' },
       cookBuffer:     { label: 'Extra rice cooked beyond what is served', value: 0.05, unit: '%', min: 0, max: 0.2, step: 0.01, source: 'No data. Vendors report under 1 kg to 3 kg unsold at closing', status: 'assumption' },
       todayLessResponse: { label: 'What a vendor does today when asked for less rice', value: 'lessVeg', unit: 'choice', options: [['lessVeg', 'Less rice, adds vegetables'], ['lessSame', 'Less rice, same price']], source: 'Vendor survey, most vendors said they add other food instead of charging less', status: 'vendor', editable: true },
@@ -37,7 +37,7 @@
       tasteLetdownOther: { label: 'Chance the food disappoints anyone else', value: 0.05, unit: '%', source: 'No data. 46 of 97 name taste as one reason they leave food', status: 'assumption' },
       ratingSensitivity: { label: 'Change in tomorrow\'s customers per star of rating difference', value: 0.30, unit: '%', source: 'No data. Illustrates how ratings drive customers', status: 'assumption' },
     },
-    calibration: 'Check against the survey: in the model about 4 in 10 Today meals leave food (38% over 40 simulated days). Our survey of 97 students (23 Never, 23 Rarely, 41 Sometimes, 10 Often, 0 Always) gives about 28% if Rarely means about 15% of meals, Sometimes 40% and Often 70%. That conversion is our assumption, and it suggests the model overstates today\'s waste, and so the waste Just Right saves. The plate-waste photo audit should replace these appetite ranges.',
+    calibration: 'Check against the survey: in the model about 36% of Today meals leave food (over 40 simulated days). Our survey of 97 students (23 Never, 23 Rarely, 41 Sometimes, 10 Often, 0 Always) gives about 28% if Rarely means about 15% of meals, Sometimes 40% and Often 70%. That conversion is our assumption, and it suggests the model overstates today\'s waste, and so the waste Just Right saves. The plate-waste photo audit should replace these appetite ranges.',
     personas: {
       light:  { name: 'The Light Eater', icon: 'feather', appetite: [0.80, 1.15], line: ['Auntie, less rice can?', 'Less rice please, cannot finish one.', 'Small bit of rice only, thanks.'], jrLine: ['One Small, please.', 'Small one, thanks.', 'Can I get the Small?'] },
       quiet:  { name: 'The Quiet One', icon: 'hand-pointing', appetite: [0.80, 1.15], line: ['(points at the dish, says nothing)', '(points, nods, looks at phone)', '(taps the glass at the dish)'], jrLine: ['(points at Small on the board)', '(taps Small on the board)', '(points at the Small price)'] },
@@ -85,7 +85,6 @@
         { id: 'smallpricey', name: 'Small and Pricey', icon: 'coins', share: 0.70, price: 6.00, queueMin: 3, stars: 4.0, blurb: 'Dainty plates, premium price.' },
         { id: 'smallcheap', name: 'Small and Cheap', icon: 'leaf', share: 0.70, price: 3.80, queueMin: 6, stars: 3.5, blurb: 'Small plates, low price.' },
         { id: 'standard', name: 'The Standard', icon: 'storefront', share: 'regular', price: 'regular', queueMin: 5, stars: 3.9, blurb: 'A normal plate at a normal price.' },
-        { id: 'justright', name: 'Just Right', icon: 'seal-check', share: 'regular', price: 'regular', queueMin: 5, stars: 4.0, blurb: 'Regular, and Small from week 2.', hasSmall: true },
       ],
     },
   };
