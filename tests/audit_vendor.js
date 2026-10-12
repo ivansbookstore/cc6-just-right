@@ -25,7 +25,7 @@ console.log('1. Orders and standard play always map to a button that exists');
   const cfg = fresh();
   const cs = JR.makeCustomers(cfg, 1, 2000);
   for (const s of ['today', 'justright', 'shortcut']) {
-    const allowed = JR.ACTIONS[s].map(a => a[0]).concat(s === 'shortcut' ? ['more'] : []);
+    const allowed = JR.actionsFor(cfg, s).map(a => a[0]).concat(s === 'shortcut' ? ['more'] : []);
     cs.forEach(c => ok(allowed.includes(JR.standardAction(c, cfg, s)), `${s}: ${c.persona} standard action ${JR.standardAction(c, cfg, s)} not a button`));
     cs.forEach(c => ok(typeof JR.lineFor(c, cfg, s) === 'string' && JR.lineFor(c, cfg, s).length > 0, `${s}: line for ${c.persona}`));
   }
@@ -51,7 +51,7 @@ console.log('3. Random play: 300 rushes, random buttons and walk-aways');
   for (let g = 0; g < 300; g++) {
     const s = r() < 0.5 ? 'today' : 'justright';
     const cs = JR.makeCustomers(cfg, 1000 + g, 20);
-    const acts = cs.map(() => r() < 0.1 ? null : JR.ACTIONS[s][Math.floor(r() * JR.ACTIONS[s].length)][0]);
+    const AS = JR.actionsFor(cfg, s); const acts = cs.map(() => r() < 0.1 ? null : AS[Math.floor(r() * AS.length)][0]);
     invariants(JR.runDay(cfg, cs, s, acts), `random game ${g} ${s}`);
   }
 }
@@ -89,6 +89,19 @@ console.log('5. Player mistakes are penalised the way a customer would react');
   ok(m3.wrongSize && m3.price === cfg.params.regularPrice.value - cfg.params.discount.value, 'wrong size served: customer still pays the Small price');
   const m4 = JR.meal(usual, 'regular', cfg, 'today');
   ok(m4.stars >= 4 && JR.bubble(m4) === 'Just nice!', 'serving a Usual their Regular is fine');
+  // one mistake, one penalty: a Small for someone who asked for Regular is "stingy", not also "wrong size"
+  const m5 = JR.meal(usual, 'small', cfg, 'justright'), m6 = JR.meal(usual, 'lessSame', cfg, 'today');
+  ok(m5.stingy && !m5.wrongSize && Math.abs(m5.stars - m6.stars) < 1e-9, `Regular asked, Small served: one penalty, same stars as a short scoop today (${m5.stars} vs ${m6.stars})`);
+  // a light eater who skips the Small asks for less rice, says so, and is happy to get the Small at the Small price
+  const lightNo = { ...light, smallNeed: Infinity };
+  ok(JR.order(lightNo, cfg, 'justright') === 'less', 'a light eater who will not take a Small asks for less rice');
+  ok(cfg.personas.light.line.includes(JR.lineFor(lightNo, cfg, 'justright')), `and says a less-rice line ("${JR.lineFor(lightNo, cfg, 'justright')}")`);
+  const m7 = JR.meal(lightNo, 'small', cfg, 'justright');
+  ok(!m7.wrongSize && !m7.stingy && m7.price === cfg.params.regularPrice.value - cfg.params.discount.value, 'asked less rice, got the Small: no penalty, pays the Small price');
+  ok(JR.standardAction(lightNo, cfg, 'justright') === cfg.params.todayLessResponse.value, 'Just Right handles less rice the same way as today');
+  // the less-rice scoop follows the Small slider
+  const c2 = fresh(); c2.params.smallShare.value = 0.6;
+  ok(Math.abs(JR.meal(light, 'lessVeg', c2, 'today').served - 0.6 * c2.params.regularRiceG.value) < 1e-9, 'a less-rice scoop is always the Small size');
 }
 
 console.log('6. Big appetites (gym, one meal a day, athletes, late lunch, quiet big eaters)');

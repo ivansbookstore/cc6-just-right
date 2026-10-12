@@ -27,10 +27,12 @@
     ['riceCost', 'Rice cost in one plate', 'S$', 0.3, 4, 0.05, x => money(x)],
     ['serveSec', 'Time to serve one plate', 's', 15, 90, 5, x => `${x} s`],
     ['stars', 'Rating', '', 2.5, 5, 0.1, x => x.toFixed(1) + ' stars'],
+    ['discount', 'Just Right: Small plate discount', 'S$', 0, 1.5, 0.05, x => x > 0 ? money(x) + ' off' : 'same price, less rice'],
   ];
   const stalls = () => C.canteenStalls(cfg(), G.edits);
   const nStudents = () => G.students || cfg().canteen.students;
-  const signature = () => JSON.stringify([stalls(), nStudents(), G.seed, P('smallShare'), P('discount'), P('lessRiceShare')]);
+  // every setting that changes the lunch: if any differs from the last run, the old run no longer counts as "the same students"
+  const signature = () => JSON.stringify([stalls(), nStudents(), G.seed, Object.entries(cfg().params).map(([k, p]) => [k, p.value])]);
   function checkSig() { const s = signature(); if (s !== G.sig) { G.sig = s; G.runs = {}; } }
 
   function showSetup() {
@@ -46,16 +48,16 @@
           <h2>The lunch</h2>
           ${gSlider('students', 'Students coming to lunch', nStudents(), ct.studentsMin, ct.studentsMax, 10, x => `${x} students`)}
           ${gSlider('smallShare', 'Just Right: Small plate, share of each Regular', P('smallShare'), 0.5, 0.9, 0.05, x => pct(x))}
-          ${gSlider('discount', 'Just Right: Small plate discount', P('discount'), 0.1, 1.5, 0.05, x => money(x) + ' off')}
-          ${U.bestCaseLine()}
+          <p class="muted small">Each stall sets its own Small price (Adjust a stall below). It starts at our rule: the biggest survey price step (S$0.20 or S$0.30) that the rice saved on one Small still covers, so a Small never earns the stall less than a Regular. A stall can also choose S$0: same price, less rice.</p>
           <p class="muted small">Students are drawn from our customer mix: ${pct(P('shareLight'))} light eaters and ${pct(P('shareNeverLeave'))} who never leave food (from our survey of ${(window.JR_SURVEY || {}).n || 97}), plus ${pct(P('shareBig'))} with big appetites (an assumption). <button class="link small" id="god-reseed">${I('arrow-counter-clockwise')}New set of students</button></p>
         </div>
         <div class="card">
           <h2>Before you open</h2>
           <p class="small">At each stall a Small saves some rice. If the discount is bigger than the rice saved, every Small costs the stall money.</p>
-          <table class="small god-be"><tr><th>Stall</th><th class="num">Small</th><th class="num">Rice saved</th><th class="num">Discount</th></tr>
-          ${sts.map(st => { const be = C.smallBreakEven(cfg(), st); return `<tr><td>${esc(st.name)}</td><td class="num">${smallG(st)} g</td><td class="num">${money(be)}</td><td class="num ${P('discount') > be + 1e-9 ? 'worse' : 'better'}">${money(P('discount'))}</td></tr>`; }).join('')}
+          <table class="small god-be"><tr><th>Stall</th><th class="num">Small</th><th class="num">Rice saved</th><th class="num">Discount</th><th class="num">Small price</th></tr>
+          ${sts.map(st => { const be = C.smallBreakEven(cfg(), st), d = C.effectiveDiscount(st); return `<tr><td>${esc(st.name)}</td><td class="num">${smallG(st)} g</td><td class="num">${money(be)}</td><td class="num ${d > be + 1e-9 ? 'worse' : 'better'}">${d > 0 ? money(d) : 'same price'}</td><td class="num">${money(C.smallPriceAt(st))}</td></tr>`; }).join('')}
           </table>
+          ${Object.values(G.edits).some(e => e.discount != null) ? `<p class="small"><button class="link small" id="god-rule">${I('sparkle')}Use the rice-saving rule for every stall</button></p>` : ''}
         </div>
       </div>
       <h2 style="margin-top:22px">The stalls</h2>
@@ -72,12 +74,13 @@
     return `<div class="slider"><label for="g-${key}"><span>${esc(label)}</span><span id="gv-${key}">${fmt(val)}</span></label>
       <input type="range" id="g-${key}" data-g="${key}" min="${min}" max="${max}" step="${step}" value="${val}"></div>`;
   }
+  const summary = st => `${st.g} g · ${money(st.price)} · ${st.stars.toFixed(1)} stars · ${st.serveSec} s a plate · Small ${st.discount > 0 ? money(st.discount) + ' off' : 'same price'}`;
   function stallCard(st) {
     const open = !!G.open[st.id];
     return `<div class="card god-stall" data-stall="${st.id}">
       <div class="row" style="gap:12px;align-items:center">
         <span class="avatar" style="width:44px;height:44px;margin:0">${I(st.icon)}</span>
-        <div style="flex:1;min-width:0"><b>${esc(st.name)}</b><div class="muted small">${st.g} g · ${money(st.price)} · ${st.stars.toFixed(1)} stars · ${st.serveSec} s a plate</div></div>
+        <div style="flex:1;min-width:0"><b>${esc(st.name)}</b><div class="muted small">${summary(st)}</div></div>
         <button class="small-btn" data-adjust="${st.id}" aria-expanded="${open}">${open ? 'Done' : 'Adjust'}</button>
       </div>
       ${open ? FIELDS.map(([k, lab, , min, max, step, fmt]) => `<div class="slider"><label for="gs-${st.id}-${k}"><span>${lab}</span><span id="gsv-${st.id}-${k}">${fmt(st[k])}</span></label>
@@ -95,12 +98,12 @@
       G.edits[id] = Object.assign({}, G.edits[id], { [k]: x });
       $(`#gsv-${id}-${k}`).textContent = f[6](x);
       const st = stalls().find(s => s.id === id);
-      inp.closest('.god-stall').querySelector('.muted.small').textContent = `${st.g} g · ${money(st.price)} · ${st.stars.toFixed(1)} stars · ${st.serveSec} s a plate`;
+      inp.closest('.god-stall').querySelector('.muted.small').textContent = summary(st);
     }));
     document.querySelectorAll('#god-setup [data-st]').forEach(inp => inp.addEventListener('change', () => showSetup()));
     document.querySelectorAll('#god-setup [data-adjust]').forEach(b => b.addEventListener('click', () => { G.open[b.dataset.adjust] = !G.open[b.dataset.adjust]; showSetup(); }));
     $('#god-reseed').addEventListener('click', () => { G.seed = U.newSeed(); showSetup(); });
-    U.bindBestCase(() => showSetup());
+    if ($('#god-rule')) $('#god-rule').addEventListener('click', () => { Object.values(G.edits).forEach(e => delete e.discount); showSetup(); });
     $('#god-reset').addEventListener('click', () => { G.edits = {}; G.open = {}; showSetup(); });
     $('#god-open-today').addEventListener('click', () => start('today'));
     $('#god-open-jr').addEventListener('click', () => start('justright'));
@@ -219,7 +222,11 @@
     if (T < s.tStart) return queueSpot(k, queueIndex(s, T));
     if (T < s.tServed) return counter(k);
     const seat = seatPos(s.seat);
-    if (T < s.tSeat) return lerp(counter(k), seat, seg(T, s.tServed, Math.min(s.tSeat, s.tServed + cfg().canteen.walkMin)));
+    if (T < s.tSeat) {
+      const arrive = s.tServed + cfg().canteen.walkMin, behind = { x: seat.x + (seat.x - seat.cx) * 0.7, y: seat.y + (seat.y - seat.cy) * 0.7 };
+      if (s.tSeat > arrive + 1e-6) return T < arrive ? lerp(counter(k), behind, seg(T, s.tServed, arrive)) : behind;   // waiting for the seat to free up
+      return lerp(counter(k), seat, seg(T, s.tServed, s.tSeat));
+    }
     if (T < s.tDone) return seat;
     if (T < s.tBin) return lerp(seat, binIn(), seg(T, s.tDone, s.tBin));
     return lerp(binIn(), L.exit, seg(T, s.tBin, s.tExit));
@@ -251,7 +258,7 @@
       ctx.fillText(fit(st.name, b.w - F - 32), b.x + F + 28, b.y + 15);
       ctx.fillStyle = colors.muted; ctx.font = `520 ${f}px Geist, system-ui, sans-serif`;
       const sm = Math.round(st.g * P('smallShare'));
-      ctx.fillText(fit(G.setting === 'justright' ? `${st.g} g, Small ${sm} g` : `${st.g} g, ${money(st.price)}`, b.w - 24), b.x + 12, b.y + F + 26);
+      ctx.fillText(fit(G.setting === 'justright' ? `${st.g} g / ${sm} g ${money(C.smallPriceAt(st))}` : `${st.g} g, ${money(st.price)}`, b.w - 24), b.x + 12, b.y + F + 26);
       ctx.fillStyle = colors.ink;
       ctx.fillText(fit(`${live.stalls[k].plates} sold, ${money(live.stalls[k].profit)}`, b.w - 24), b.x + 12, b.y + F + f + 34);
       // counter
@@ -458,8 +465,8 @@
           <div class="legend small"><span><i class="today"></i>Today</span><span><i class="jr"></i>Just Right</span></div>
         </div>
         <p class="small">Just Right mostly cuts the waste from plates that were too big. Waste from taste and from rushing changes little: a smaller plate does not fix those.</p>
-        ${B.profit < A.profit ? (() => { const over = G.stallsUsed.filter(st => P('discount') > C.smallBreakEven(cfg(), st) + 1e-9).length;
-          return `<div class="note warn">Profit fell by ${money(A.profit - B.profit)}. ${over ? `At ${over} of ${G.stallsUsed.length} stalls the ${money(P('discount'))} discount is bigger than the rice a Small saves. Try a smaller discount on the setup screen and run it again.` : 'Students also moved between stalls. Try other prices or discounts and run it again.'}</div>`; })()
+        ${B.profit < A.profit ? (() => { const over = G.stallsUsed.filter(st => C.effectiveDiscount(st) > C.smallBreakEven(cfg(), st) + 1e-9);
+          return `<div class="note warn">Profit fell by ${money(A.profit - B.profit)}. ${over.length ? `At ${over.map(st => esc(st.name)).join(', ')} the Small discount is bigger than the rice a Small saves. Try a smaller discount there and run it again.` : 'Every discount is within the rice saved, so this is students moving between stalls (and the luck of one lunch). Try another set of students, or other prices.'}</div>`; })()
           : `<div class="note good">Profit rose by ${money(B.profit - A.profit)} while ${kg(A.wasteG - B.wasteG)} less food went in the bin.</div>`}
         <p class="muted small">A simulation under stated assumptions (stall prices, portions, how students choose, eating speed), not real sales data. Our survey suggests about 28% of meals leave food; this canteen has two huge-plate stalls, so it leaves more.</p>
         ${btns}</div>`;

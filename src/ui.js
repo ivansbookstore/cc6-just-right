@@ -177,13 +177,13 @@
     }));
     renderSetupNote();
   }
-  // the Just Right defaults are our best case: the most waste cut without lowering profit or ratings (see config.js)
+  // the Just Right defaults: 150 g Small and a discount set by the rice-saving rule (see config.js)
   const isBestCase = () => ['smallShare', 'discount'].every(k => Math.abs(cfg.params[k].value - window.JR_CONFIG.defaults[k].value) < 1e-9);
   function bestCaseLine() {
     const D = window.JR_CONFIG.defaults;
     return isBestCase()
-      ? `<p class="muted small">These are our best-case settings: a Small of ${pct(D.smallShare.value)} of Regular and ${money(D.discount.value)} off. In our tests they cut the most waste without lowering profit or ratings.</p>`
-      : `<p class="small"><button class="link small" id="best-case">${I('sparkle')}Back to our best-case settings (${pct(D.smallShare.value)} Small, ${money(D.discount.value)} off)</button></p>`;
+      ? `<p class="muted small">Our default: a Small of ${pct(D.smallShare.value)} of Regular, and a discount set by our rule: the biggest survey price step (S$0.20 or S$0.30) that the rice saved still covers. Here that is ${money(D.discount.value)}. Set it to S$0 for "same price, less rice".</p>`
+      : `<p class="small"><button class="link small" id="best-case">${I('sparkle')}Back to our default (${pct(D.smallShare.value)} Small, ${money(D.discount.value)} off)</button></p>`;
   }
   function bindBestCase(after) {
     const b = document.getElementById('best-case');
@@ -254,7 +254,7 @@
       <div class="patience" id="patience" role="progressbar" aria-label="Patience"><div></div></div>`;
     cust.style.display = ''; cust.classList.remove('enter'); void cust.offsetWidth; cust.classList.add('enter');
     $('#feedback').className = 'feedback'; $('#feedback').innerHTML = '';
-    const acts = JR.ACTIONS[set];
+    const acts = JR.actionsFor(cfg, set);
     const box = $('#actions');
     box.className = 'actions n' + acts.length; box.style.display = ''; box.setAttribute('data-nosound', '');
     box.innerHTML = acts.map(([k, lab], i) => {
@@ -339,7 +339,7 @@
     if (!$('#rush').classList.contains('on')) return;
     if (S.showing && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); next(); return; }
     if (!S.showing && /^[1-4]$/.test(e.key)) {
-      const a = JR.ACTIONS[S.setting][parseInt(e.key, 10) - 1];
+      const a = JR.actionsFor(cfg, S.setting)[parseInt(e.key, 10) - 1];
       if (a) { e.preventDefault(); serve(a[0]); }
     }
   });
@@ -365,7 +365,9 @@
     const semWaste = ((J.plateWasteG + J.unsoldG) - (T.plateWasteG + T.unsoldG)) * SEMESTER_DAYS;
     const semProfit = (J.profit - T.profit) * SEMESTER_DAYS;
     const leftDrop = T.leftFood - J.leftFood;
-    const tomorrow = r => Math.round(P('platesPerDay') * Math.max(0.5, Math.min(1.2, 1 + P('ratingSensitivity') * (r - T.rating))));
+    // baseline: the same rush customers served the standard way under Today, so standard play gives exactly today's customers
+    const baseRating = JR.runDay(cfg, S.rush, 'today').rating;
+    const tomorrow = r => Math.round(P('platesPerDay') * Math.max(0.5, Math.min(1.2, 1 + P('ratingSensitivity') * (r - baseRating))));
     $('#report-body').innerHTML = `
       <div class="report-head">
         <h1 style="font-size:clamp(32px,5vw,46px)">Closing time</h1>
@@ -415,7 +417,7 @@
             ${r2('Average rating', you.rating.toFixed(2), oth.rating.toFixed(2))}
             ${r2('Customers tomorrow at this rating', tomorrow(you.rating), tomorrow(oth.rating))}
           </table></div>
-          <p class="muted small">Tomorrow's customers use the same rule as the shortcut panel: ${pct(P('ratingSensitivity'))} more or fewer customers per star above or below Today's standard rating (${T.rating.toFixed(2)}).</p>
+          <p class="muted small">Tomorrow's customers: ${pct(P('ratingSensitivity'))} more or fewer per star above or below the rating these same ${S.rush.length} customers give under Today when served the standard way (${baseRating.toFixed(2)}).</p>
         </div>
         <div class="card">
           <h2>How ratings drop</h2>
@@ -484,6 +486,7 @@
   });
   function startWeek(n) {
     ST.weekNo = n; ST.week = JR.studentWeek(cfg, ST.profile); ST.dayIdx = 0; ST.money = ST.profile.budget; ST.choices = []; ST.cur = null;
+    if (ST.profile.q5) ST.real.q5 = ST.profile.q5;          // "Where you stand" shows the answer you played with
     go('s-day'); renderDay();
   }
   const BREAKFAST = { skipped: 'You skipped breakfast, so you are hungrier than usual.', normal: 'You had a normal breakfast.', big: 'You had a big breakfast, so you are less hungry.' };
@@ -537,7 +540,8 @@
     const option = stall.options.find(o => o.size === size);
     if (option.price > ST.money + 1e-9) return;
     ST.money = round2(ST.money - option.price);
-    ST.cur = { stall, option, eaten: 0, cap: Math.min(option.g, JR.maxEatG(cfg, d, stall)) };
+    const timeCap = JR.maxEatG(cfg, d, stall);
+    ST.cur = { stall, option, eaten: 0, cap: Math.min(option.g, timeCap), timeCap };
     SND.play('coin');
     renderEat();
     const chip = $('#s-hud .chip:last-child'); bump(chip); floatText(chip, '−' + money(option.price), true);
@@ -547,7 +551,8 @@
     sHud();
     const d = ST.week[ST.dayIdx], c = ST.cur, onPlate = c.option.g - c.eaten;
     const prevOnPlate = prevEaten == null ? null : c.option.g - prevEaten;
-    const timeLeft = d.rush ? Math.max(0, Math.round((c.cap - c.eaten) / cfg.student.biteG)) : null;
+    // minutes of eating time left: from the clock, not from what is left on the plate
+    const timeLeft = d.rush ? Math.max(0, Math.round((c.timeCap - c.eaten) / cfg.student.biteG * cfg.student.minutesPerBite)) : null;
     $('#s-body').innerHTML = `
       <div class="card eat">
         <h2>${esc(c.stall.name)}: ${esc(c.option.label.toLowerCase())}, ${c.option.g} g</h2>
@@ -623,7 +628,7 @@
     const w1 = ST.results[1], w2 = ST.results[2];
     const row = (label, f, fmt, lowerBetter) => `<tr><td>${label}</td><td class="num">${fmt(f(w1))}</td>${w2 ? `<td class="num">${fmt(f(w2))}</td><td class="num">${cmp(f(w1), f(w2), lowerBetter, fmt)}</td>` : ''}</tr>`;
     const id = x => x, g = x => Math.round(x) + ' g', of5 = x => x + ' of 5';
-    const dayList = r => r.days.map(d => `<tr><td>${d.day.day}</td><td>${esc(d.stall)}${d.size === 'small' ? ', Small' : ''}</td><td class="num">${Math.round(d.meal.left)} g</td><td>${d.meal.fullness === 'right' ? 'Just right' : d.meal.fullness === 'hungry' ? 'Still hungry' : 'Stuffed'}</td></tr>`).join('');
+    const dayList = r => r.days.map(d => `<tr><td>${d.day.day}</td><td>${esc(d.stall)}${d.size === 'small' ? ', Small' : d.size === 'more' ? ', Add rice' : ''}</td><td class="num">${Math.round(d.meal.left)} g</td><td>${d.meal.fullness === 'right' ? 'Just right' : d.meal.fullness === 'hungry' ? 'Still hungry' : 'Stuffed'}</td></tr>`).join('');
     $('#s-report-body').innerHTML = `
       <div class="report-head"><h1 style="font-size:clamp(32px,5vw,46px)">${w2 ? 'Week 1 against week 2' : 'Your week'}</h1>
         <p class="lede">${w2 ? 'The same five days. In week 2 every stall offered a Regular and a Small plate.' : 'Five lunches. Here is what they added up to.'}</p></div>
@@ -650,7 +655,7 @@
           <p>Answer some of our real survey questions and see how you compare with ${SV.n} NTU students. Your game week is on there too.</p>
           <button class="primary btn-ic" id="s-stand-card">${I('users')}See where you stand</button>` : `
           <h2>Try the same week again</h2>
-          <p>Same days, same appetite, same budget. This time Just Right is canteen-wide: every stall sells a Regular and a Small plate. A Small has ${pct(1 - P('smallShare'))} less rice and costs ${money(P('discount'))} less.</p>
+          <p>Same days, same appetite, same budget. This time Just Right is canteen-wide: every stall sells a Regular and a Small plate. A Small has ${pct(1 - P('smallShare'))} less rice, and each stall sets its own discount (${(() => { const ds = JR.studentStalls(cfg, 2).map(s => (s.options.find(o => o.size === 'small') || {}).discount || 0); const lo = Math.min(...ds), hi = Math.max(...ds); return lo === hi ? money(lo) : money(lo) + ' to ' + money(hi); })()} off).</p>
           <p class="muted small">Not every leftover is about size. A rushed lunch or a long queue still costs you.</p>`}
         </div>
       </div>
@@ -689,7 +694,7 @@
   function openStand(from) {
     ST.standFrom = from;
     $('#stand-back').innerHTML = I('arrow-left') + (from === 's-report' ? 'Back to your week' : 'Home');
-    if (ST.profile && ST.profile.q5 && !ST.real.q5) ST.real.q5 = ST.profile.q5;
+    if (ST.profile && ST.profile.q5 && !ST.real.q5) ST.real.q5 = ST.profile.q5;   // (startWeek keeps this current)
     renderStand(); go('s-stand');
   }
   function bars(q, mine, gameMark) {
@@ -764,7 +769,7 @@
     return `${Math.round(p.value * 100) / 100}${p.unit ? ' ' + p.unit : ''}`;
   }
   const GROUPS = [
-    ['survey', 'From our student survey', 'Wave 1, 22 responses.'],
+    ['survey', 'From our student survey', `${(window.JR_SURVEY || {}).n || 97} responses, ${(window.JR_SURVEY || {}).collected || '1 to 7 October 2026'}.`],
     ['vendor', 'From our vendor survey', 'Early answers. To confirm before quoting.'],
     ['assumption', 'Assumptions', 'No data yet. The pilot and photo audit should replace these.'],
   ];

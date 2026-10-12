@@ -31,7 +31,7 @@ Every number lives in [`src/config.js`](src/config.js) with its source and a sta
 - **vendor**: our vendor survey (early answers, to be confirmed)
 - **assumption**: no data yet, shown as such in the game
 
-Just Right starts at our best case: a Small of 75% of Regular (150 g) at S$0.30 off. Across the tested range (Small 65% to 85%, discount S$0.20 to S$0.50) it cut the most waste without lowering vendor profit or ratings in both the one-stall and the whole-canteen model. Whether a customer takes the Small depends on the discount, using survey question 10.
+Just Right defaults: a Small of 75% of Regular (150 g at The Standard). Each stall sets its own Small discount; by default it is the biggest survey price step (S$0.20 or S$0.30, from question 10) that the rice saved on one Small still covers, so a Small never earns a stall less than a Regular. A stall can choose S$0: same price, less rice. Of the Small sizes we tested (140 g to 170 g), 150 g is the only one where both the one-stall and the whole-canteen model cut waste without lowering profit or ratings. Whether a customer takes the Small depends on the discount, using survey question 10.
 
 Change a value there, or on the in-game "How this works" screen, and both modes follow. Results are a simulation under stated assumptions, not real sales or waste data. All student-mode stall prices, portions, queues and ratings are assumptions for the game.
 

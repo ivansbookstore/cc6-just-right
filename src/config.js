@@ -6,16 +6,16 @@
 (function (root) {
   const CONFIG = {
     version: '0.1 (MVP)',
-    build: '0.9.1',                       // shown bottom-right; bump with every push so a stale cache is easy to spot
+    build: '0.10',                       // shown bottom-right; bump with every push so a stale cache is easy to spot
     params: {
       regularRiceG:   { label: 'Rice/noodles in a Regular plate', value: 200, unit: 'g', min: 150, max: 260, step: 10, source: 'Vendor survey, portion question (answers ~150-250 g)', status: 'vendor' },
-      smallShare:     { label: 'Small plate as a share of Regular', value: 0.75, unit: '%', min: 0.5, max: 0.9, step: 0.05, source: 'Group decision (150 g on a 200 g Regular), to test in the pilot. Also the best case in our model with a S$0.30 discount', status: 'assumption', editable: true },
+      smallShare:     { label: 'Small plate as a share of Regular', value: 0.75, unit: '%', min: 0.5, max: 0.9, step: 0.05, source: 'Group decision (150 g on a 200 g Regular), to test in the pilot. Of 140 g to 170 g, the only size where both the one-stall and the whole-canteen model cut waste without lowering profit or ratings', status: 'assumption', editable: true },
       regularPrice:   { label: 'Price of a Regular plate', value: 5.00, unit: 'S$', min: 4, max: 9, step: 0.1, source: 'Vendor survey, price question (S$4.50-8.00)', status: 'vendor', editable: true },
-      discount:       { label: 'Small plate discount', value: 0.30, unit: 'S$', min: 0.1, max: 1.5, step: 0.05, source: 'Best case in our model (tested 150 g to 170 g Small and S$0.20 to S$0.50 off): cuts the most waste without lowering profit or ratings. Below the S$0.39 of rice a 150 g Small saves; the most common answer in our survey Q10 (23 of 97); vendors suggested S$0.50 to S$1', status: 'assumption', editable: true },
+      discount:       { label: 'Small plate discount at this stall', value: 0.30, unit: 'S$', min: 0, max: 1.5, step: 0.05, source: 'Our rule: the biggest survey price step (Q10: S$0.20 or S$0.30, the most common answer) that the rice saved on one Small still covers. Here a 150 g Small saves about S$0.39 of rice, so S$0.30. S$0 means same price, less rice. Vendors suggested S$0.50 to S$1', status: 'assumption', editable: true },
       riceCostRegular:{ label: 'Rice/noodle cost in a Regular plate', value: 1.50, unit: 'S$', min: 0.3, max: 3, step: 0.1, source: 'Vendor survey, cost question. Answers unclear (rice only, or whole plate?). Confirm.', status: 'vendor', editable: true },
       toppingCost:    { label: 'Cost of everything else on the plate', value: 2.00, unit: 'S$', min: 1, max: 4, step: 0.1, source: 'No data. Does not change the Today vs Just Right difference', status: 'assumption' },
       extraVegCost:   { label: 'Cost of the extra vegetables a vendor adds instead of a discount', value: 0.30, unit: 'S$', min: 0, max: 1, step: 0.05, source: 'No data. Vendors said they add vegetables or meat instead of charging less', status: 'assumption' },
-      lessRiceShare:  { label: '"Less rice" scoop today, as a share of Regular', value: 0.75, unit: '%', min: 0.5, max: 0.9, step: 0.05, source: 'Assumed equal to the Small plate', status: 'assumption' },
+      // a "less rice" scoop is always the same size as the Small plate (smallShare), in every mode
       addRiceShare:   { label: '"Add rice" plate, as a share of Regular', value: 1.25, unit: '%', min: 1.1, max: 1.5, step: 0.05, source: 'No data', status: 'assumption' },
       cookBuffer:     { label: 'Extra rice cooked beyond what is served', value: 0.05, unit: '%', min: 0, max: 0.2, step: 0.01, source: 'No data. Vendors report under 1 kg to 3 kg unsold at closing', status: 'assumption' },
       todayLessResponse: { label: 'What a vendor does today when asked for less rice', value: 'lessVeg', unit: 'choice', options: [['lessVeg', 'Less rice, adds vegetables'], ['lessSame', 'Less rice, same price']], source: 'Vendor survey, most vendors said they add other food instead of charging less', status: 'vendor', editable: true },
@@ -60,6 +60,10 @@
       'Zhi Hao', 'Hui Min', 'Daniel', 'Amirah', 'Ethan', 'Yi Ting', 'Haziq', 'Sneha', 'Bryan', 'Wen Qi', 'Irfan', 'Meera', 'Javier', 'Pei Shan', 'Danish', 'Ananya', 'Sean', 'Li Ting', 'Faris', 'Rachel'],
     // how much cheaper a Small must be before a student will take it: our survey question 10 (97 answers).
     // "More than 50 cents" is read as 80 cents (our assumption); "would not choose a smaller portion" never takes it.
+    // the discount steps a stall can pick by default (survey Q10 price points). Each stall takes the biggest one its rice saving covers.
+    // Capped at S$0.30, the most common survey answer: in God Mode a bigger discount mostly pulls students from other stalls
+    // (S$0.50 at the two big-plate stalls cut canteen profit by about S$6 a lunch for little extra waste saved).
+    smallDiscountSteps: [0, 0.20, 0.30],
     smallDiscountNeeded: { source: 'Student survey (97 responses), Q10', answers: [[0, 10], [0.20, 10], [0.30, 23], [0.50, 13], [0.80, 20], [null, 21]] },
     patienceSpread: [0.75, 1.30],       // each customer's patience, times the patience setting. Rushers get the bottom half. Game difficulty, not data.
     bigLabel: 'Big appetites',

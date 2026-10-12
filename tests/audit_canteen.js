@@ -1,5 +1,6 @@
 // God Mode audit. Run with:  node tests/audit_canteen.js
 const C = require('../src/canteen.js');
+const c0ids = () => require('../src/config.js').student.stalls.map(s => s.id);
 const BASE = require('../src/config.js');
 const fresh = () => JSON.parse(JSON.stringify(BASE));
 let checks = 0, fails = 0;
@@ -66,8 +67,8 @@ console.log('3. Extreme stall settings never break the model');
     const st = C.canteenStalls(cfg, edits);
     invariants(cfg, st, C.canteenDay(cfg, st, set, 5, { students: 300 }), `extreme ${JSON.stringify(c).slice(0, 40)} ${set}`);
   }
-  const cfg = fresh(); cfg.params.discount.value = 1.5;
-  const st = C.canteenStalls(cfg, { smallcheap: { price: 2 } });
+  const cfg = fresh();
+  const st = C.canteenStalls(cfg, { smallcheap: { price: 2, discount: 1.5 } });
   ok(C.canteenDay(cfg, st, 'justright', 3).students.every(s => s.price >= 1), 'a Small never costs less than S$1');
 }
 
@@ -79,16 +80,31 @@ console.log('4. Direction checks over 30 lunches');
   ok(wJ < wT, `Just Right puts less food in the bin (${(wT / 1000).toFixed(2)} kg vs ${(wJ / 1000).toFixed(2)} kg)`);
   const pT = avg(cfg, 'today', t => t.wasteWhy.portion), pJ = avg(cfg, 'justright', t => t.wasteWhy.portion);
   ok(pJ < pT, 'the cut comes from plates that were too big');
-  const cheap = fresh(); cheap.params.discount.value = 0.30;
-  const prT = avg(cheap, 'today', t => t.profit), prJ = avg(cheap, 'justright', t => t.profit);
-  ok(prJ > prT, `with a discount below the rice saved, Just Right raises profit (S$${prT.toFixed(2)} vs S$${prJ.toFixed(2)})`);
-  const dear = fresh(); dear.params.discount.value = 1.0;
-  ok(avg(dear, 'justright', t => t.profit) < avg(dear, 'today', t => t.profit), 'with a S$1.00 discount, Just Right lowers profit');
+  const prT = avg(cfg, 'today', t => t.profit), prJ = avg(cfg, 'justright', t => t.profit);
+  ok(prJ > prT, `with each stall's discount within its rice saving (the default rule), Just Right raises profit (S$${prT.toFixed(2)} vs S$${prJ.toFixed(2)})`);
+  const avgE = (edits, set, f) => { const c = fresh(), st2 = C.canteenStalls(c, edits); let x = 0; for (let s = 1; s <= 30; s++) x += f(C.canteenDay(c, st2, set, s).totals); return x / 30; };
+  const dearE = Object.fromEntries(c0ids().map(id => [id, { discount: 1.0 }]));
+  ok(avgE(dearE, 'justright', t => t.profit) < avgE({}, 'today', t => t.profit), 'with a S$1.00 discount everywhere, Just Right lowers profit');
+  const sameE = Object.fromEntries(c0ids().map(id => [id, { discount: 0 }]));
+  ok(avgE(sameE, 'justright', t => t.profit) >= prT - 1e-9 && avgE(sameE, 'justright', t => t.wasteG) < wT, '"same price, less rice" at every stall: profit not lower, still less waste');
   const more = fresh(), few = fresh(); more.canteen.students = 400; few.canteen.students = 100;
   ok(avg(more, 'today', t => t.avgWait) > avg(few, 'today', t => t.avgWait), 'a bigger crowd means longer queues');
   const slow = fresh(); slow.canteen.jrExtraSec = 20;
   ok(avg(slow, 'justright', t => t.avgWait) > avg(fresh(), 'justright', t => t.avgWait), 'if two sizes slowed serving, queues would grow');
-  console.log(`   30 lunches of 200: bin ${(wT / 1000).toFixed(2)} kg Today vs ${(wJ / 1000).toFixed(2)} kg Just Right; profit at a S$0.30 discount S$${prT.toFixed(2)} vs S$${prJ.toFixed(2)}`);
+  console.log(`   30 lunches of 200: bin ${(wT / 1000).toFixed(2)} kg Today vs ${(wJ / 1000).toFixed(2)} kg Just Right; profit S$${prT.toFixed(2)} vs S$${prJ.toFixed(2)}`);
+  // God Mode's own rules, checked directly
+  const cd = fresh(), sd = C.canteenStalls(cd);
+  for (let s = 1; s <= 10; s++) for (const set of ['today', 'justright']) {
+    const d = C.canteenDay(cd, sd, set, s);
+    d.students.forEach(x => {
+      ok(Math.abs(x.split.portion + x.split.taste + x.split.time - x.leftover) < 1e-6, 'each leftover is split across reasons with nothing lost');
+      const again = C.outcome(cd, { size: x.size, served: x.served, need: x.need, price: x.price, extraCost: x.size === 'less' && cd.params.todayLessResponse.value === 'lessVeg' ? cd.params.extraVegCost.value : 0 }, x.eaten, x.split.time > 0 && x.why !== 'taste' ? 'time' : x.split.taste > 0 ? 'taste' : (x.why === 'time' ? 'time' : null));
+      ok(Math.abs(again.stars - x.stars) < 1e-9, `stars always match how the meal ended (${x.persona}, ${x.why})`);
+      if (cd.personas[x.persona].asks === 'more') ok(x.size !== 'more' || x.need > sd[x.stall].g, 'a big eater only asks for more rice when the plate is not already enough');
+    });
+  }
+  const e400 = C.canteenStalls(cd, { generous: { g: 400 } }), g0 = C.canteenStalls(cd).find(s => s.id === 'generous');
+  ok(Math.abs(e400.find(s => s.id === 'generous').riceCost - g0.riceCost * 400 / g0.g) < 0.01, 'a bigger plate costs more rice');
 }
 
 console.log('5. The Just Right defaults are a best case: less waste, profit and rating not lower, in both models');
@@ -104,6 +120,8 @@ console.log('5. The Just Right defaults are a best case: less waste, profit and 
     g.tw += t.wasteG; g.jw += j.wasteG; g.tp += t.profit; g.jp += j.profit; g.tr += t.rating; g.jr += j.rating; }
   ok(g.jw < g.tw && g.jp >= g.tp && g.jr >= g.tr - 1e-9, `whole canteen: bin ${(g.tw / 24000).toFixed(2)} kg -> ${(g.jw / 24000).toFixed(2)} kg, profit S$${(g.tp / 24).toFixed(2)} -> S$${(g.jp / 24).toFixed(2)}, rating not lower`);
   ok(cfg.params.discount.value <= JR.breakEvenDiscount(cfg) + 1e-9, 'the default discount is no bigger than the rice a Small saves at the Standard stall');
+  ok(C.canteenStalls(cfg).every(s => C.effectiveDiscount(s) <= C.smallBreakEven(cfg, s) + 1e-9), 'every stall\'s default discount is within its rice saving');
+  ok(C.canteenStalls(cfg).find(s => s.id === 'standard').discount === cfg.params.discount.value, 'the Standard stall in God Mode matches vendor mode');
   console.log(`   one stall: ${(v.tw / 200).toFixed(0)} g -> ${(v.jw / 200).toFixed(0)} g plate waste a day, profit S$${(v.tp / 200).toFixed(2)} -> S$${(v.jp / 200).toFixed(2)}; canteen: ${(g.tw / 24000).toFixed(2)} -> ${(g.jw / 24000).toFixed(2)} kg, S$${(g.tp / 24).toFixed(2)} -> S$${(g.jp / 24).toFixed(2)}`);
 }
 

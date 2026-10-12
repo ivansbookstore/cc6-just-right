@@ -18,6 +18,15 @@
   const v = (cfg, k) => cfg.params[k].value;
   const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
   const round2 = x => Math.round(x * 100) / 100;
+  // a "less rice" scoop is the same size as the Small plate (config says so; this keeps them tied when the Small slider moves)
+  const lessShare = cfg => v(cfg, 'smallShare');
+  // each stall's Small discount: the biggest survey price step (Q10) that the rice saved on one Small still covers,
+  // so a Small never earns the stall less than a Regular. 0 means "same price, less rice".
+  function riceSaved(cfg, riceCostPlate) { return riceCostPlate * (1 - v(cfg, 'smallShare')) * (1 + v(cfg, 'cookBuffer')); }
+  function smallDiscountFor(cfg, riceCostPlate) {
+    const saved = riceSaved(cfg, riceCostPlate), steps = cfg.smallDiscountSteps || [0, 0.2, 0.3, 0.5];
+    return steps.filter(d => d <= saved + 1e-9).reduce((a, d) => Math.max(a, d), 0);
+  }
 
   // ---------- persona mix (survey shares, big eaters added on top)
   function personaWeights(cfg) {
@@ -73,10 +82,10 @@
       // only if the discount is big enough for them (survey Q10); a customer object without the draw keeps the old behaviour
       if (wantsSmall && !(v(cfg, 'discount') + 1e-9 < (c.smallNeed == null ? 0 : c.smallNeed))) return 'small';
       // the Small is not worth it to them: a light eater still asks for less rice, as they would today
-      if (c.persona === 'light' && c.appetite <= v(cfg, 'lessRiceShare') / 0.85) return 'less';
+      if (c.persona === 'light' && c.appetite <= lessShare(cfg) / 0.85) return 'less';
       return 'regular';
     }
-    if (c.persona === 'light' && c.appetite <= v(cfg, 'lessRiceShare') / 0.85) return 'less';   // only asks when less still leaves them full
+    if (c.persona === 'light' && c.appetite <= lessShare(cfg) / 0.85) return 'less';   // only asks when less still leaves them full
     return 'regular';                                       // today and shortcut: no size choice
   }
   // pick one of several lines with the customer's own roll, so the same customer always says the same thing
@@ -85,6 +94,7 @@
     const p = cfg.personas[c.persona], ol = cfg.orderLines || {}, roll = c.lineRoll;
     let line = pick(setting === 'justright' ? p.jrLine : p.line, roll);
     const o = order(c, cfg, setting);
+    if (setting === 'justright' && o === 'less') line = pick(p.line, roll);
     if (setting === 'justright' && o === 'small' && c.persona !== 'quiet') line = pick(ol.small || 'One Small, please.', roll);
     if (setting === 'justright' && o === 'regular' && c.persona === 'light') line = pick(ol.regular || 'Regular, please.', roll);
     if (setting === 'justright' && o === 'regular' && c.persona === 'quiet') line = pick(ol.quietRegular || '(points at Regular on the board)', roll);
@@ -100,21 +110,28 @@
     justright: [['regular', 'Regular'], ['small', 'Small'], ['lessVeg', 'Less rice, add veg'], ['more', 'Add rice']],
     shortcut: [['shrink', 'Regular (shrunk)']],
   };
+  // the buttons a vendor has; under Just Right the "less rice" button is whatever this vendor does today
+  function actionsFor(cfg, setting) {
+    if (setting !== 'justright') return ACTIONS[setting];
+    const lr = v(cfg, 'todayLessResponse'), lab = ACTIONS.today.find(a => a[0] === lr)[1];
+    return ACTIONS.justright.map(a => a[0] === 'lessVeg' ? [lr, lab] : a);
+  }
   function standardAction(c, cfg, setting) {
     if (setting === 'shortcut') return asksMore(c, cfg) ? 'more' : 'shrink';
     const o = order(c, cfg, setting);
-    if (o === 'less') return setting === 'justright' ? 'lessVeg' : v(cfg, 'todayLessResponse');
+    if (o === 'less') return v(cfg, 'todayLessResponse');
     return o;                                               // regular / small / more
   }
 
   // ---------- one meal
   function meal(c, action, cfg, setting) {
     const R = v(cfg, 'regularRiceG'), P = v(cfg, 'regularPrice');
-    const shares = { regular: 1, small: v(cfg, 'smallShare'), lessSame: v(cfg, 'lessRiceShare'), lessVeg: v(cfg, 'lessRiceShare'), more: v(cfg, 'addRiceShare'), shrink: v(cfg, 'smallShare') };
+    const shares = { regular: 1, small: v(cfg, 'smallShare'), lessSame: lessShare(cfg), lessVeg: lessShare(cfg), more: v(cfg, 'addRiceShare'), shrink: v(cfg, 'smallShare') };
     const served = R * shares[action];
     const asked = order(c, cfg, setting);
     // Customers pay for what they ordered: on the Just Right board that is the price of the size they asked for.
-    const price = setting === 'justright' ? (asked === 'small' ? P - v(cfg, 'discount') : P) : P;
+    const smallPrice = (asked === 'small' || (asked === 'less' && action === 'small'));
+    const price = setting === 'justright' && smallPrice ? P - v(cfg, 'discount') : P;
     const extraCost = action === 'lessVeg' ? v(cfg, 'extraVegCost') : 0;
     const want = R * c.appetite;
     const letdown = c.tasteRoll < (c.persona === 'picky' ? v(cfg, 'tasteLetdownPicky') : v(cfg, 'tasteLetdownOther'));
@@ -141,10 +158,10 @@
     const gotLessThanAsked = (asked === 'regular' || asked === 'more') && served < R * 0.95;
     const stingy = gotLessThanAsked;
     if (stingy) { stars -= 1.5; notes.push('stingy'); }
-    if (action === 'small' && asked === 'small') stars += 0.3;               // paid less for less
+    if (action === 'small' && (asked === 'small' || asked === 'less')) stars += 0.3;   // paid less for less
     if (action === 'lessSame' && asked === 'less') stars -= 0.3;            // less food, same price
     if (action === 'lessVeg' && asked === 'less') stars += 0.2;             // feels generous
-    const wrongSize = setting === 'justright' && ((asked === 'small' && action !== 'small') || (asked !== 'small' && asked !== 'less' && action === 'small'));
+    const wrongSize = !stingy && setting === 'justright' && ((asked === 'small' && action !== 'small') || (asked !== 'small' && asked !== 'less' && action === 'small'));   // never on top of "stingy"
     if (wrongSize) { stars -= 0.5; notes.push('wrong'); }
     const ignored = asked === 'less' && (action === 'regular' || action === 'more');   // asked for less rice, did not get it
     if (ignored) { stars -= 0.5; notes.push('ignored'); }
@@ -209,7 +226,7 @@
   }
 
   function breakEvenDiscount(cfg) {
-    return v(cfg, 'riceCostRegular') * (1 - v(cfg, 'smallShare')) * (1 + v(cfg, 'cookBuffer'));
+    return riceSaved(cfg, v(cfg, 'riceCostRegular'));
   }
 
   // =====================================================================
@@ -243,8 +260,9 @@
       const price = x.price === 'regular' ? P : x.price;
       // week 2: Just Right across the whole canteen. Every stall adds a Small: its own plate cut by the Small share, its own price less the discount.
       const jr = weekNo >= 2;
-      const options = [{ size: 'regular', label: jr ? 'Regular' : 'One size', g, price }];
-      if (jr) options.push({ size: 'small', label: 'Small', g: Math.round(g * v(cfg, 'smallShare')), price: round2(Math.max(1, price - v(cfg, 'discount'))) });
+      const options = [{ size: 'regular', label: jr || x.share === 'regular' ? 'Regular' : 'One size', g, price }];
+      const disc = smallDiscountFor(cfg, v(cfg, 'riceCostRegular') * g / R);
+      if (jr) options.push({ size: 'small', label: disc > 0 ? 'Small' : 'Small, same price', g: Math.round(g * v(cfg, 'smallShare')), price: round2(Math.max(1, price - disc)), discount: disc });
       // like the vendor game: at a normal-price stall you can ask for more rice at the same price
       if (x.share === 'regular') options.push({ size: 'more', label: 'Add rice', g: Math.round(R * v(cfg, 'addRiceShare')), price });
       return { ...x, options };
@@ -287,9 +305,9 @@
       const stall = ch.stallId === 'skip' ? SKIP : stalls.find(x => x.id === ch.stallId);
       const option = stall.options.find(o => o.size === ch.size) || stall.options[0];
       const meal = studentMeal(cfg, day, stall, option, ch.eatenG);
-      money -= meal.price;
+      money = round2(money - meal.price);                  // cents, exactly as the screen counts them
       const pm = afternoon(cfg, day, meal, money);
-      money -= pm.snack;
+      money = round2(money - pm.snack);
       return { day, stall: stall.name, size: option.size, meal, pm, moneyAfter: money };
     });
     const t = days.reduce((a, d) => {
@@ -313,7 +331,7 @@
     return best;
   }
 
-  const API = { rng, makeCustomers, personaWeights, order, lineFor, ACTIONS, standardAction, meal, bubble, runDay, runRatingDays, breakEvenDiscount, round2,
+  const API = { rng, makeCustomers, personaWeights, order, lineFor, ACTIONS, actionsFor, riceSaved, smallDiscountFor, standardAction, meal, bubble, runDay, runRatingDays, breakEvenDiscount, round2,
     studentProfile, studentWeek, studentStalls, maxEatG, studentMeal, afternoon, runStudentWeek, bestFit, SKIP };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.JR = API;
 })(typeof window !== 'undefined' ? window : globalThis);

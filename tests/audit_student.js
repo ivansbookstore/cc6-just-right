@@ -44,12 +44,22 @@ console.log('2. Stalls');
   for (const st of s2) {
     const reg = st.options.find(o => o.size === 'regular'), sm = st.options.find(o => o.size === 'small');
     ok(sm.g === Math.round(reg.g * cfg.params.smallShare.value), `${st.id}: Small is the Small share of its own plate (${sm.g} g of ${reg.g} g)`);
-    ok(sm.price < reg.price && sm.price >= 1 && Math.abs(sm.price - Math.max(1, reg.price - cfg.params.discount.value)) < 1e-9, `${st.id}: Small costs the discount less (S$${sm.price.toFixed(2)})`);
+    const rule = JR.smallDiscountFor(cfg, cfg.params.riceCostRegular.value * reg.g / R);
+    ok(sm.price <= reg.price && sm.price >= 1 && Math.abs(sm.price - Math.max(1, reg.price - rule)) < 1e-9 && rule <= JR.riceSaved(cfg, cfg.params.riceCostRegular.value * reg.g / R) + 1e-9, `${st.id}: Small costs its own discount less (S$${rule.toFixed(2)} off, within the rice saved)`);
     const w1 = s1.find(x => x.id === st.id).options.find(o => o.size === 'regular');
     ok(w1.g === reg.g && w1.price === reg.price, `${st.id}: Regular plate unchanged between weeks`);
   }
   const stdSmall = s2.find(s => s.id === 'standard').options.find(o => o.size === 'small');
-  ok(stdSmall.g === Math.round(R * cfg.params.smallShare.value) && Math.abs(stdSmall.price - (P - cfg.params.discount.value)) < 1e-9, `The Standard's Small matches the vendor Small plate (${stdSmall.g} g)`);
+  ok(stdSmall.g === Math.round(R * cfg.params.smallShare.value) && Math.abs(stdSmall.price - (P - cfg.params.discount.value)) < 1e-9, `The Standard's Small matches the vendor Small plate (${stdSmall.g} g, S$${stdSmall.price.toFixed(2)})`);
+  // the end-of-week report counts money in cents like the screen, so a S$4.00 snack is bought when exactly S$4.00 is left
+  {
+    const pr = JR.studentProfile(cfg, { q5: 'Sometimes', breakfast: 'sometimes', budget: 30 });
+    const ch = [['generous', 'regular', 280], ['standard', 'regular', 200], ['smallcheap', 'regular', 140], ['standard', 'regular', 200], ['smallpricey', 'small', 105]].map(([stallId, size, eatenG]) => ({ stallId, size, eatenG }));
+    const r = JR.runStudentWeek(cfg, pr, 2, ch);
+    ok(r.days.every(d => Math.abs(d.moneyAfter * 100 - Math.round(d.moneyAfter * 100)) < 1e-6), 'money is always whole cents');
+    const last = r.days[4]; const before = last.moneyAfter + last.pm.snack;
+    ok(!(Math.abs(before - cfg.student.snackPrice) < 1e-9 && last.meal.fullness === 'hungry') || last.pm.snack === cfg.student.snackPrice, 'exactly S$4.00 left and hungry: the snack is bought');
+  }
   const std = s1.find(s => s.id === 'standard').options[0];
   ok(std.g === R && std.price === P, 'The Standard Regular matches the vendor Regular plate');
 }

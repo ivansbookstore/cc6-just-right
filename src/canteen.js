@@ -6,73 +6,76 @@
   const v = (cfg, k) => cfg.params[k].value;
   const round2 = x => Math.round(x * 100) / 100;
 
-  // ---------- the stalls before opening: defaults from config, then the player's edits
+  // ---------- the stalls before opening: defaults from config, then the player's edits.
+  // Costs follow the (edited) plate size and price unless the player set them directly.
+  // discount: each stall's own Small discount. Default = the rice-saving rule; 0 = "same price, less rice".
   function canteenStalls(cfg, edits) {
     const R = v(cfg, 'regularRiceG'), P = v(cfg, 'regularPrice'), cR = v(cfg, 'riceCostRegular'), ct = cfg.canteen;
     return cfg.student.stalls.map(x => {
-      const g = x.share === 'regular' ? R : Math.round(R * x.share);
-      const d = {
-        id: x.id, name: x.name, icon: x.icon,
-        g, price: x.price === 'regular' ? P : x.price, stars: x.stars,
-        riceCost: round2(cR * g / R),                         // rice in one of its own plates, same cost per gram as the vendor survey answer
-        otherCost: round2(P > 0 ? v(cfg, 'toppingCost') * (x.price === 'regular' ? P : x.price) / P : v(cfg, 'toppingCost')),   // same share of price as vendor mode
-        serveSec: ct.serveSec[x.id] || 35,
+      const e = (edits && edits[x.id]) || {};
+      const g = e.g != null ? e.g : (x.share === 'regular' ? R : Math.round(R * x.share));
+      const price = e.price != null ? e.price : (x.price === 'regular' ? P : x.price);
+      const riceCost = e.riceCost != null ? e.riceCost : round2(cR * g / R);             // same cost per gram as the vendor survey answer
+      return {
+        id: x.id, name: x.name, icon: x.icon, g, price, riceCost,
+        stars: e.stars != null ? e.stars : x.stars,
+        otherCost: e.otherCost != null ? e.otherCost : round2(P > 0 ? v(cfg, 'toppingCost') * price / P : v(cfg, 'toppingCost')),   // same share of price as vendor mode
+        serveSec: e.serveSec != null ? e.serveSec : (ct.serveSec[x.id] || 35),
+        discount: e.discount != null ? e.discount : JR.smallDiscountFor(cfg, riceCost),
       };
-      return Object.assign(d, (edits && edits[x.id]) || {});
     });
   }
+  const smallPriceAt = st => round2(Math.max(1, st.price - st.discount));
+  const effectiveDiscount = st => round2(st.price - smallPriceAt(st));
 
   // what this student orders at this stall, and what lands on the plate
   function orderAt(c, cfg, st, setting) {
     const p = cfg.personas[c.persona], need = c.appetite * v(cfg, 'regularRiceG');
-    const smallG = Math.round(st.g * v(cfg, 'smallShare')), lessG = Math.round(st.g * v(cfg, 'lessRiceShare'));
-    const moreG = Math.round(st.g * v(cfg, 'addRiceShare')), smallPrice = round2(Math.max(1, st.price - v(cfg, 'discount')));
+    const smallG = Math.round(st.g * v(cfg, 'smallShare')), lessG = smallG;           // a "less rice" scoop is the Small size
+    const moreG = Math.round(st.g * v(cfg, 'addRiceShare'));
+    const lightAsksLess = c.persona === 'light' && need <= lessG / 0.85;
     let size;
-    if (p.bigGroup) size = p.asks === 'more' ? 'more' : 'regular';
+    if (p.bigGroup) size = p.asks === 'more' && need > st.g ? 'more' : 'regular';   // only asks for more if this stall's plate is not already enough
     else if (setting === 'justright') {
       const cut = smallG / 0.85;                                 // a Small that still leaves them "just right"
       const fits = need <= cut || (c.budget && need <= 0.95 * st.g);
       const near = Math.abs(need - cut) < 0.15 * st.g;
       const right = !near || c.sizeRoll < v(cfg, 'chooseRightSize');
-      size = fits === right && !(v(cfg, 'discount') + 1e-9 < (c.smallNeed == null ? 0 : c.smallNeed)) ? 'small'
-        : c.persona === 'light' && need <= lessG / 0.85 ? 'less' : 'regular';     // no Small for them: ask for less rice, as today
-    } else {
-      size = c.persona === 'light' && need <= lessG / 0.85 ? 'less' : 'regular';
-      if (size === 'regular' && need > st.g * 1.15 && p.asks === 'more') size = 'more';
-    }
-    if (size === 'regular' && p.bigGroup && p.asks === 'more') size = 'more';
+      const priceOk = effectiveDiscount(st) + 1e-9 >= (c.smallNeed == null ? 0 : c.smallNeed);   // survey Q10: is this discount enough for them?
+      size = fits === right && priceOk ? 'small' : lightAsksLess ? 'less' : 'regular';   // no Small for them: ask for less rice, as today
+    } else size = lightAsksLess ? 'less' : 'regular';
     const served = { regular: st.g, small: smallG, less: lessG, more: moreG }[size];
-    const price = size === 'small' ? smallPrice : st.price;
-    const extraCost = size === 'less' && (setting === 'justright' || v(cfg, 'todayLessResponse') === 'lessVeg') ? v(cfg, 'extraVegCost') : 0;
+    const price = size === 'small' ? smallPriceAt(st) : st.price;
+    const extraCost = size === 'less' && v(cfg, 'todayLessResponse') === 'lessVeg' ? v(cfg, 'extraVegCost') : 0;
     return { size, served, price, extraCost, need };
   }
 
-  // eating, with the same rules as vendor mode
-  // timeModel: in the canteen a rusher's limit is the clock (minutes left), not the flat vendor-mode cap
-  function eat(c, cfg, o, timeModel) {
-    const p = cfg.personas[c.persona];
-    const letdown = c.tasteRoll < (c.persona === 'picky' ? v(cfg, 'tasteLetdownPicky') : v(cfg, 'tasteLetdownOther'));
-    let eaten;
-    if (p.cleanPlater) eaten = o.served;
-    else {
-      eaten = Math.min(o.served, o.need * (letdown ? 0.6 : 1));
-      if (c.rusher && !timeModel) eaten = Math.min(eaten, v(cfg, 'regularRiceG') * v(cfg, 'rushEatCap'));
-    }
-    const leftover = o.served - eaten, ratio = eaten / o.need;
-    let fullness = ratio < 0.85 ? 'hungry' : ratio > 1.15 ? 'stuffed' : 'right';
-    let why = null;
-    if (letdown && !p.cleanPlater && leftover > 1) why = 'taste';
-    else if (c.rusher && !p.cleanPlater && leftover > 1 && eaten < o.need) why = 'time';
-    else if (leftover > v(cfg, 'leftThresholdG')) why = 'portion';
+  // how a meal ends, once we know how much was eaten and why it stopped. One place, so nothing is counted twice.
+  // Stars follow vendor mode: a taste letdown costs 1 star (not also "hungry"); running out of time costs 0.3.
+  function outcome(cfg, o, eaten, cause) {
+    const leftover = Math.max(0, o.served - eaten), ratio = eaten / o.need;
+    const fullness = ratio < 0.85 ? 'hungry' : ratio > 1.15 ? 'stuffed' : 'right';
+    // split the leftover: the part beyond what they needed is "too much on the plate"; the rest is the cause that stopped them
+    const excess = Math.max(0, o.served - o.need), portionPart = Math.min(leftover, excess);
+    const split = { portion: portionPart, taste: 0, time: 0 };
+    if (cause) split[cause] = leftover - portionPart; else split.portion = leftover;
+    const why = leftover <= 1e-9 ? null : cause && split[cause] >= portionPart ? cause : 'portion';   // the main reason, for the screen
     let stars = 4;
+    if (cause === 'taste') stars -= 1;
+    else if (cause === 'time' && fullness === 'hungry') stars -= 0.3;
+    else if (fullness === 'hungry') stars -= 1.5;
     if (fullness === 'right') stars += 0.5;
-    if (fullness === 'hungry') stars -= why === 'time' ? 0.3 : 1.5;
     if (fullness === 'stuffed') stars -= 0.7;
-    if (why === 'taste') stars -= 1;
     if (o.size === 'small') stars += 0.3;
     if (o.size === 'less') stars += o.extraCost > 0 ? 0.2 : -0.3;
-    stars = Math.max(1, Math.min(5, stars));
-    return { eaten, leftover, fullness, why, stars };
+    return { eaten, leftover, fullness, why, split, stars: Math.max(1, Math.min(5, stars)) };
+  }
+  // what they would eat with all the time in the world (taste and clean-plating, as in vendor mode)
+  function wantToEat(c, cfg, o) {
+    const p = cfg.personas[c.persona];
+    const letdown = !p.cleanPlater && c.tasteRoll < (c.persona === 'picky' ? v(cfg, 'tasteLetdownPicky') : v(cfg, 'tasteLetdownOther'));
+    const eaten = p.cleanPlater ? o.served : Math.min(o.served, o.need * (letdown ? 0.6 : 1));
+    return { eaten, cause: letdown && eaten < o.served - 1e-9 ? 'taste' : null };
   }
 
   // arrival times: a triangle from the door opening, busiest at peakMin, last arrival at 75% of lunch
@@ -112,23 +115,24 @@
       const serveMin = (st.serveSec + (setting === 'justright' ? ct.jrExtraSec : 0)) / 60;
       const tStart = Math.max(tAt, T.busyUntil), tServed = tStart + serveMin;
       T.busyUntil = tServed;
-      let m = eat(c, cfg, o, true);
-      // seat: the first free one, or wait for the next to free up
+      const want = wantToEat(c, cfg, o);
+      let eaten = want.eaten, cause = want.cause;
+      // seat: a free one (students spread out over the tables), or wait for the next to free up
       let si = -1;
-      const from = (i * 37) % seatFree.length;                 // students spread out over the tables
+      const from = (i * 37) % seatFree.length;
       for (let j = 0; j < seatFree.length; j++) { const k = (from + j) % seatFree.length; if (seatFree[k] <= tServed + w) { si = k; break; } }
       if (si < 0) { si = 0; for (let k = 1; k < seatFree.length; k++) if (seatFree[k] < seatFree[si]) si = k; }
       const tSeat = Math.max(tServed + w, seatFree[si]);
-      let eatMin = ct.eatBaseMin + m.eaten / ct.eatGPerMin;
-      if (c.rusher) {                                           // must leave on time: eat what fits in the minutes left
-        const left = t0 + ct.rushLeaveMin - 2 * w - tSeat;
+      let eatMin = ct.eatBaseMin + eaten / ct.eatGPerMin;
+      if (c.rusher) {                                           // the clock is their only limit: eat what fits before they must go
+        const left = t0 + ct.rushLeaveMin - 1.6 * w - tSeat;    // minus the walks to the bin (0.6) and out (1.0)
         if (eatMin > left) {
           const can = Math.max(0, (Math.max(left, 1) - ct.eatBaseMin) * ct.eatGPerMin);
-          if (can < m.eaten) { m = eat(c, cfg, o, true); m.eaten = Math.max(0, can); m.leftover = o.served - m.eaten; m.why = 'time';
-            const ratio = m.eaten / o.need; m.fullness = ratio < 0.85 ? 'hungry' : ratio > 1.15 ? 'stuffed' : 'right'; }
+          if (can < eaten) { eaten = can; cause = 'time'; }
           eatMin = Math.max(1, left);
         }
       }
+      const m = outcome(cfg, o, eaten, cause);
       const tDone = tSeat + eatMin; seatFree[si] = tDone + 0.2;
       const tBin = tDone + w * 0.6, tExit = tBin + w;
       // the stall's books
@@ -140,7 +144,7 @@
       T.starsSum += m.stars; T[m.fullness]++; T.waitSum += tStart - tAt;
       const mealProfit = o.price - cooked * costG - st.otherCost - o.extraCost;
       out.push({ i, persona: c.persona, name: p.name, profit: mealProfit, first: c.first, icon: p.icon, budget: c.budget, rusher: c.rusher, stall: best, size: o.size, served: o.served, price: o.price,
-        need: o.need, eaten: m.eaten, leftover: m.leftover, fullness: m.fullness, why: m.why, stars: m.stars, seat: si,
+        need: o.need, eaten: m.eaten, leftover: m.leftover, fullness: m.fullness, why: m.why, split: m.split, stars: m.stars, seat: si,
         t0, tAt, tStart, tServed, tSeat, tDone, tBin, tExit });
     });
     S.forEach(T => { T.profit = T.revenue - T.riceCost - T.otherCost; T.rating = T.plates ? T.starsSum / T.plates : 0; });
@@ -149,13 +153,13 @@
       wasteG: sum('wasteG'), unsoldG: sum('unsoldG'), cookedG: sum('cookedG'), servedG: sum('servedG'), leftFood: sum('leftFood'), small: sum('small'), less: sum('less'), more: sum('more'),
       right: sum('right'), hungry: sum('hungry'), stuffed: sum('stuffed'), rating: sum('starsSum') / n, avgWait: sum('waitSum') / n,
       endMin: Math.max(...out.map(s => s.tExit)),
-      wasteWhy: ['portion', 'taste', 'time'].reduce((a, k) => (a[k] = out.filter(s => s.why === k).reduce((x, s) => x + s.leftover, 0), a), {}) };
+      wasteWhy: ['portion', 'taste', 'time'].reduce((a, k) => (a[k] = out.reduce((x, s) => x + s.split[k], 0), a), {}) };   // adds up to the whole bin
     return { setting, seed, stalls: S, students: out, totals };
   }
 
-  // rice saved on one Small at this stall, against the discount (the break-even discount)
-  const smallBreakEven = (cfg, st) => round2((st.riceCost * (1 - v(cfg, 'smallShare'))) * (1 + v(cfg, 'cookBuffer')));
+  // rice saved on one Small at this stall (what the discount should not exceed)
+  const smallBreakEven = (cfg, st) => round2(JR.riceSaved(cfg, st.riceCost));
 
-  const API = { canteenStalls, canteenDay, orderAt, smallBreakEven };
+  const API = { canteenStalls, canteenDay, orderAt, smallBreakEven, smallPriceAt, effectiveDiscount, outcome };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.JR_CANTEEN = API;
 })(typeof window !== 'undefined' ? window : globalThis);
