@@ -146,6 +146,7 @@
     if (id === 'how') renderHow();
     if (id === 'setup') renderSetup();
     if (id === 'start') renderPreview();
+    document.dispatchEvent(new CustomEvent('jr:screen', { detail: id }));
     window.scrollTo(0, 0);
   }
   document.addEventListener('click', e => {
@@ -794,6 +795,8 @@
           ${JR.studentStalls(cfg, 2).map(x => `<tr><td>${esc(x.name)}</td><td class="num">${x.options.map(o => o.g + ' g').join(', ')}</td><td class="num">${x.options.map(o => money(o.price)).join(', ')}</td><td class="num">${x.queueMin} min</td><td class="num">${x.stars.toFixed(1)}</td></tr>`).join('')}
         </table></div>
         <p class="muted small">All student-mode numbers are assumptions for the game, not survey data. The Standard uses the vendor Regular plate. In week 2 Just Right is canteen-wide: every stall adds a Small plate with the vendor Small share of its own rice, for the vendor discount less. So both modes agree.</p>
+        <h3>God Mode</h3>
+        <p class="small">A whole canteen at lunch: the five student-mode stalls, ${cfg.canteen.seats} seats, one food waste bin and ${cfg.canteen.students} students by default, drawn from the same customer mix as vendor mode. Students pick a stall by how hungry they are, the price, the queue and the rating, plus personal taste; they avoid plates too small for them more than plates too big (our assumption). They eat for ${cfg.canteen.eatBaseMin} minutes plus ${cfg.canteen.eatGPerMin} g of rice a minute, and students in a rush leave ${cfg.canteen.rushLeaveMin} minutes after walking in. Other ingredients cost the same share of the price as in vendor mode. Today and Just Right run with the very same students, so the difference is the menu alone.</p>
         <h3>Where you stand</h3>
         <p class="small">That screen compares your own answers with ${SV.n} NTU students who answered our Google Form (${esc(SV.collected)}). It shows counts only, with no individual responses, and nothing you tap is saved or sent. Your game week is placed on question 2 by days with food left: 0 Never, 1 Rarely, 2 to 3 Sometimes, 4 Often, 5 Always (our mapping).</p>
       </div>
@@ -813,4 +816,6 @@
       renderHow();
     });
   }
+  // shared with God Mode (src/god.js)
+  window.JR_UI = { go, getCfg: () => cfg, SND, I, money, pct, esc, newSeed, urlSeed, reduceMotion: () => RM() };
 })();

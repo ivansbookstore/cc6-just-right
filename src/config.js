@@ -6,7 +6,7 @@
 (function (root) {
   const CONFIG = {
     version: '0.1 (MVP)',
-    build: '0.7',                       // shown bottom-right; bump with every push so a stale cache is easy to spot
+    build: '0.8',                       // shown bottom-right; bump with every push so a stale cache is easy to spot
     params: {
       regularRiceG:   { label: 'Rice/noodles in a Regular plate', value: 200, unit: 'g', min: 150, max: 260, step: 10, source: 'Vendor survey, portion question (answers ~150-250 g)', status: 'vendor' },
       smallShare:     { label: 'Small plate as a share of Regular', value: 0.75, unit: '%', min: 0.5, max: 0.9, step: 0.05, source: 'Group decision (150 g on a 200 g Regular), to test in the pilot', status: 'assumption', editable: true },
@@ -86,6 +86,20 @@
         { id: 'smallcheap', name: 'Small and Cheap', icon: 'leaf', share: 0.70, price: 3.80, queueMin: 6, stars: 3.5, blurb: 'Small plates, low price.' },
         { id: 'standard', name: 'The Standard', icon: 'storefront', share: 'regular', price: 'regular', queueMin: 5, stars: 3.9, blurb: 'A normal plate at a normal price.' },
       ],
+    },
+    // ---------- God Mode: a whole canteen at lunch. Uses the student-mode stalls and the vendor-mode customers and settings.
+    // Everything below is an assumption for the simulation unless it says otherwise.
+    canteen: {
+      students: 200, studentsMin: 50, studentsMax: 400,            // students who come in over one lunch
+      lunchMin: 90, peakMin: 18,                                   // 12:00 to 1:30, busiest about 12:18
+      seats: 96,                                                   // 24 tables of 4
+      walkMin: 0.5,                                                // each walk: door to stall, stall to seat, seat to bin, bin to door
+      eatBaseMin: 4, eatGPerMin: 18,                               // eating time = 4 min + rice eaten / 18 g a minute
+      rushLeaveMin: 25,                                            // a student in a rush leaves 25 min after walking in
+      serveSec: { generous: 35, bigbowl: 40, smallpricey: 30, smallcheap: 35, standard: 32 },
+      jrExtraSec: 0,                                               // extra seconds per plate with two sizes. Vendors mostly said no slowdown (they pre-measure)
+      // how students pick a stall: avoid a plate too small for their hunger (big plates bother them less), lower price, shorter wait, better rating, plus personal taste (noise)
+      choice: { under: 3.0, over: 2.0, price: 1.0, budgetPrice: 2.5, wait: 0.12, rushWait: 0.35, stars: 0.5, pickyStars: 1.0, noise: 0.6 },
     },
   };
   CONFIG.defaults = JSON.parse(JSON.stringify(CONFIG.params));

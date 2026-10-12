@@ -19,6 +19,8 @@ Because both settings use exactly the same customers, any difference comes from 
 
 **Be the student.** Answer three questions (our survey question on whether the standard portion is too big for you, how often you eat breakfast, your weekly budget), then eat lunch Monday to Friday. Pick a stall, eat bite by bite while a hunger bar fills, and stop when you like. Stopping too early leaves you hungry; finishing a big plate can leave you stuffed in a 2 pm lecture; leaving rice wastes food. Then replay the same week with Just Right canteen-wide (every stall sells a Regular and a Small plate) and compare.
 
+**God Mode.** A top-down canteen: an entrance, five stalls with queues, 24 tables, a food waste bin and an exit. Set each stall's plate size, price, rice cost, serving speed and rating before opening, then watch a lunch of 50 to 400 students walk in, queue, order by hunger, eat and scrape what is left into the bin. A live dashboard counts people, the bin's weight, how full students felt, and each stall's sales and profit. Run the same students under Today and under Just Right to compare waste, profit and margins ([`src/canteen.js`](src/canteen.js), tested by `tests/audit_canteen.js`).
+
 **Where you stand.** From the home screen or the end of your week, answer our real survey questions as yourself and see how you compare with the 97 NTU students who answered it: a bar chart per question with your answer highlighted, and your game week placed on the "how often do you leave food" question. It uses counts only ([`src/survey.js`](src/survey.js)); nothing you tap is saved or sent.
 
 ## Where the numbers come from
@@ -38,6 +40,7 @@ Every new game draws a fresh queue of customers (names, lines and patience vary 
 ```
 node tests/engine.test.js     # core model tests
 node tests/audit_vendor.js    # vendor mode: every persona, every setting at its limits, 300 random rushes, direction checks
+node tests/audit_canteen.js   # God Mode: timelines, queues, seats, the bin and the books over 72 lunches; direction checks
 node tests/audit_student.js   # student mode: every appetite, breakfast habit and budget; simulated players; money, time and waste rules
 ```
 
@@ -49,6 +52,8 @@ css/style.css           layout for phone and computer, light and dark mode
 fonts/                  Geist (SIL Open Font License, see GEIST-OFL.txt)
 src/config.js           every number, with source and status
 src/engine.js           the model: customers, meals, ratings, profit, the student week (no screen code)
+src/canteen.js          God Mode: one canteen lunch, worked out in full (no screen code)
+src/god.js              God Mode screen: the map, the live dashboard, the comparison
 src/survey.js           student survey answer counts (97 responses, no individual rows)
 src/icons.js            Phosphor Icons (MIT)
 src/sound.js            sound effects and music, synthesised in the browser
