@@ -6,7 +6,7 @@
 (function (root) {
   const CONFIG = {
     version: '0.1 (MVP)',
-    build: '0.9',                       // shown bottom-right; bump with every push so a stale cache is easy to spot
+    build: '0.9.1',                       // shown bottom-right; bump with every push so a stale cache is easy to spot
     params: {
       regularRiceG:   { label: 'Rice/noodles in a Regular plate', value: 200, unit: 'g', min: 150, max: 260, step: 10, source: 'Vendor survey, portion question (answers ~150-250 g)', status: 'vendor' },
       smallShare:     { label: 'Small plate as a share of Regular', value: 0.75, unit: '%', min: 0.5, max: 0.9, step: 0.05, source: 'Group decision (150 g on a 200 g Regular), to test in the pilot. Also the best case in our model with a S$0.30 discount', status: 'assumption', editable: true },
@@ -98,7 +98,7 @@
       seats: 96,                                                   // 24 tables of 4
       walkMin: 0.5,                                                // each walk: door to stall, stall to seat, seat to bin, bin to door
       eatBaseMin: 4, eatGPerMin: 18,                               // eating time = 4 min + rice eaten / 18 g a minute
-      rushLeaveMin: 25,                                            // a student in a rush leaves 25 min after walking in
+      rushLeaveMin: 20,                                            // a student in a rush leaves 20 min after walking in. Set so that, as in survey Q4, running out of time is a rare reason for leaving food (about 1 in 10 here, 6% in the survey)
       serveSec: { generous: 35, bigbowl: 40, smallpricey: 30, smallcheap: 35, standard: 32 },
       jrExtraSec: 0,                                               // extra seconds per plate with two sizes. Vendors mostly said no slowdown (they pre-measure)
       // how students pick a stall: avoid a plate too small for their hunger (big plates bother them less), lower price, shorter wait, better rating, plus personal taste (noise)

@@ -48,14 +48,15 @@
   }
 
   // eating, with the same rules as vendor mode
-  function eat(c, cfg, o) {
+  // timeModel: in the canteen a rusher's limit is the clock (minutes left), not the flat vendor-mode cap
+  function eat(c, cfg, o, timeModel) {
     const p = cfg.personas[c.persona];
     const letdown = c.tasteRoll < (c.persona === 'picky' ? v(cfg, 'tasteLetdownPicky') : v(cfg, 'tasteLetdownOther'));
     let eaten;
     if (p.cleanPlater) eaten = o.served;
     else {
       eaten = Math.min(o.served, o.need * (letdown ? 0.6 : 1));
-      if (c.rusher) eaten = Math.min(eaten, v(cfg, 'regularRiceG') * v(cfg, 'rushEatCap'));
+      if (c.rusher && !timeModel) eaten = Math.min(eaten, v(cfg, 'regularRiceG') * v(cfg, 'rushEatCap'));
     }
     const leftover = o.served - eaten, ratio = eaten / o.need;
     let fullness = ratio < 0.85 ? 'hungry' : ratio > 1.15 ? 'stuffed' : 'right';
@@ -111,7 +112,7 @@
       const serveMin = (st.serveSec + (setting === 'justright' ? ct.jrExtraSec : 0)) / 60;
       const tStart = Math.max(tAt, T.busyUntil), tServed = tStart + serveMin;
       T.busyUntil = tServed;
-      let m = eat(c, cfg, o);
+      let m = eat(c, cfg, o, true);
       // seat: the first free one, or wait for the next to free up
       let si = -1;
       const from = (i * 37) % seatFree.length;                 // students spread out over the tables
@@ -123,7 +124,7 @@
         const left = t0 + ct.rushLeaveMin - 2 * w - tSeat;
         if (eatMin > left) {
           const can = Math.max(0, (Math.max(left, 1) - ct.eatBaseMin) * ct.eatGPerMin);
-          if (can < m.eaten) { m = eat(c, cfg, o); m.eaten = Math.max(0, can); m.leftover = o.served - m.eaten; m.why = 'time';
+          if (can < m.eaten) { m = eat(c, cfg, o, true); m.eaten = Math.max(0, can); m.leftover = o.served - m.eaten; m.why = 'time';
             const ratio = m.eaten / o.need; m.fullness = ratio < 0.85 ? 'hungry' : ratio > 1.15 ? 'stuffed' : 'right'; }
           eatMin = Math.max(1, left);
         }
