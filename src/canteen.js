@@ -34,7 +34,8 @@
       const fits = need <= cut || (c.budget && need <= 0.95 * st.g);
       const near = Math.abs(need - cut) < 0.15 * st.g;
       const right = !near || c.sizeRoll < v(cfg, 'chooseRightSize');
-      size = fits === right ? 'small' : 'regular';
+      size = fits === right && !(v(cfg, 'discount') + 1e-9 < (c.smallNeed == null ? 0 : c.smallNeed)) ? 'small'
+        : c.persona === 'light' && need <= lessG / 0.85 ? 'less' : 'regular';     // no Small for them: ask for less rice, as today
     } else {
       size = c.persona === 'light' && need <= lessG / 0.85 ? 'less' : 'regular';
       if (size === 'regular' && need > st.g * 1.15 && p.asks === 'more') size = 'more';
@@ -42,7 +43,7 @@
     if (size === 'regular' && p.bigGroup && p.asks === 'more') size = 'more';
     const served = { regular: st.g, small: smallG, less: lessG, more: moreG }[size];
     const price = size === 'small' ? smallPrice : st.price;
-    const extraCost = size === 'less' && v(cfg, 'todayLessResponse') === 'lessVeg' ? v(cfg, 'extraVegCost') : 0;
+    const extraCost = size === 'less' && (setting === 'justright' || v(cfg, 'todayLessResponse') === 'lessVeg') ? v(cfg, 'extraVegCost') : 0;
     return { size, served, price, extraCost, need };
   }
 
@@ -68,8 +69,7 @@
     if (fullness === 'stuffed') stars -= 0.7;
     if (why === 'taste') stars -= 1;
     if (o.size === 'small') stars += 0.3;
-    if (o.size === 'less' && v(cfg, 'todayLessResponse') === 'lessSame') stars -= 0.3;
-    if (o.size === 'less' && v(cfg, 'todayLessResponse') === 'lessVeg') stars += 0.2;
+    if (o.size === 'less') stars += o.extraCost > 0 ? 0.2 : -0.3;
     stars = Math.max(1, Math.min(5, stars));
     return { eaten, leftover, fullness, why, stars };
   }

@@ -50,6 +50,11 @@
       o.lineRoll = r();
       const pr = r(), lo = sp[0], hi = o.rusher ? (sp[0] + sp[1]) / 2 : sp[1];
       o.patience = lo + pr * (hi - lo);
+      // the discount this student needs before they take a Small (survey Q10). Drawn last, so it changes nothing else.
+      const q = cfg.smallDiscountNeeded;
+      if (q) { const tot = q.answers.reduce((a, x) => a + x[1], 0); let u = r() * tot; o.smallNeed = q.answers[q.answers.length - 1][0];
+        for (const [d, n] of q.answers) { if (u < n) { o.smallNeed = d; break; } u -= n; }
+        if (o.smallNeed === null) o.smallNeed = Infinity; }
     }
     return out;
   }
@@ -64,7 +69,12 @@
       const fitsSmall = c.appetite <= cut || (c.budget && c.appetite <= 0.95);   // budget-minded stretch to Small a little further
       const nearLine = Math.abs(c.appetite - cut) < 0.15;     // only people near the line pick the wrong size
       const right = !nearLine || c.sizeRoll < v(cfg, 'chooseRightSize');
-      return (fitsSmall === right) ? 'small' : 'regular';
+      const wantsSmall = fitsSmall === right;
+      // only if the discount is big enough for them (survey Q10); a customer object without the draw keeps the old behaviour
+      if (wantsSmall && !(v(cfg, 'discount') + 1e-9 < (c.smallNeed == null ? 0 : c.smallNeed))) return 'small';
+      // the Small is not worth it to them: a light eater still asks for less rice, as they would today
+      if (c.persona === 'light' && c.appetite <= v(cfg, 'lessRiceShare') / 0.85) return 'less';
+      return 'regular';
     }
     if (c.persona === 'light' && c.appetite <= v(cfg, 'lessRiceShare') / 0.85) return 'less';   // only asks when less still leaves them full
     return 'regular';                                       // today and shortcut: no size choice
@@ -87,13 +97,13 @@
   // ---------- actions a vendor can take, by setting
   const ACTIONS = {
     today: [['regular', 'Regular'], ['lessSame', 'Less rice, same price'], ['lessVeg', 'Less rice, add veg'], ['more', 'Add rice']],
-    justright: [['regular', 'Regular'], ['small', 'Small'], ['more', 'Add rice']],
+    justright: [['regular', 'Regular'], ['small', 'Small'], ['lessVeg', 'Less rice, add veg'], ['more', 'Add rice']],
     shortcut: [['shrink', 'Regular (shrunk)']],
   };
   function standardAction(c, cfg, setting) {
     if (setting === 'shortcut') return asksMore(c, cfg) ? 'more' : 'shrink';
     const o = order(c, cfg, setting);
-    if (o === 'less') return v(cfg, 'todayLessResponse');
+    if (o === 'less') return setting === 'justright' ? 'lessVeg' : v(cfg, 'todayLessResponse');
     return o;                                               // regular / small / more
   }
 
@@ -134,7 +144,7 @@
     if (action === 'small' && asked === 'small') stars += 0.3;               // paid less for less
     if (action === 'lessSame' && asked === 'less') stars -= 0.3;            // less food, same price
     if (action === 'lessVeg' && asked === 'less') stars += 0.2;             // feels generous
-    const wrongSize = setting === 'justright' && ((asked === 'small' && action !== 'small') || (asked !== 'small' && action === 'small'));
+    const wrongSize = setting === 'justright' && ((asked === 'small' && action !== 'small') || (asked !== 'small' && asked !== 'less' && action === 'small'));
     if (wrongSize) { stars -= 0.5; notes.push('wrong'); }
     const ignored = asked === 'less' && (action === 'regular' || action === 'more');   // asked for less rice, did not get it
     if (ignored) { stars -= 0.5; notes.push('ignored'); }

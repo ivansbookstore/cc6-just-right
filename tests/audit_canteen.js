@@ -16,7 +16,7 @@ function invariants(cfg, st, d, label) {
     ok(['right', 'hungry', 'stuffed'].includes(s.fullness) && s.stars >= 1 && s.stars <= 5, `${L}: outcome and stars valid`);
     ok([s.served, s.price, s.profit, s.need].every(finite) && s.price > 0, `${L}: numbers valid`);
     if (d.setting === 'today') ok(s.size !== 'small', `${L}: no Small today`);
-    if (d.setting === 'justright') ok(s.size !== 'less', `${L}: no "less rice" with Just Right`);
+    if (d.setting === 'justright' && s.size === 'less') ok(s.persona === 'light', `${L}: with Just Right only a light eater who skips the Small asks for less rice`);
     if (cfg.personas[s.persona].bigGroup) ok(s.size !== 'small' && s.size !== 'less', `${L}: big appetite never orders smaller`);
     if (s.rusher) ok(s.tDone <= s.t0 + ct.rushLeaveMin + 1 + eps || s.tSeat >= s.t0 + ct.rushLeaveMin - 2 * ct.walkMin - 1, `${L}: rusher leaves on time`);
   }
@@ -89,6 +89,22 @@ console.log('4. Direction checks over 30 lunches');
   const slow = fresh(); slow.canteen.jrExtraSec = 20;
   ok(avg(slow, 'justright', t => t.avgWait) > avg(fresh(), 'justright', t => t.avgWait), 'if two sizes slowed serving, queues would grow');
   console.log(`   30 lunches of 200: bin ${(wT / 1000).toFixed(2)} kg Today vs ${(wJ / 1000).toFixed(2)} kg Just Right; profit at a S$0.30 discount S$${prT.toFixed(2)} vs S$${prJ.toFixed(2)}`);
+}
+
+console.log('5. The Just Right defaults are a best case: less waste, profit and rating not lower, in both models');
+{
+  const JR = require('../src/engine.js');
+  const cfg = fresh(), st = C.canteenStalls(cfg);
+  let v = { tw: 0, jw: 0, tp: 0, jp: 0, tr: 0, jr: 0 };
+  for (let s = 1; s <= 200; s++) { const cs = JR.makeCustomers(cfg, s, 80), t = JR.runDay(cfg, cs, 'today'), j = JR.runDay(cfg, cs, 'justright');
+    v.tw += t.plateWasteG; v.jw += j.plateWasteG; v.tp += t.profit; v.jp += j.profit; v.tr += t.rating; v.jr += j.rating; }
+  ok(v.jw < v.tw && v.jp >= v.tp && v.jr >= v.tr - 1e-9, `one stall: waste ${(v.tw / 200).toFixed(0)} g -> ${(v.jw / 200).toFixed(0)} g, profit S$${(v.tp / 200).toFixed(2)} -> S$${(v.jp / 200).toFixed(2)}, rating not lower`);
+  let g = { tw: 0, jw: 0, tp: 0, jp: 0, tr: 0, jr: 0 };
+  for (let s = 1; s <= 24; s++) { const t = C.canteenDay(cfg, st, 'today', s).totals, j = C.canteenDay(cfg, st, 'justright', s).totals;
+    g.tw += t.wasteG; g.jw += j.wasteG; g.tp += t.profit; g.jp += j.profit; g.tr += t.rating; g.jr += j.rating; }
+  ok(g.jw < g.tw && g.jp >= g.tp && g.jr >= g.tr - 1e-9, `whole canteen: bin ${(g.tw / 24000).toFixed(2)} kg -> ${(g.jw / 24000).toFixed(2)} kg, profit S$${(g.tp / 24).toFixed(2)} -> S$${(g.jp / 24).toFixed(2)}, rating not lower`);
+  ok(cfg.params.discount.value <= JR.breakEvenDiscount(cfg) + 1e-9, 'the default discount is no bigger than the rice a Small saves at the Standard stall');
+  console.log(`   one stall: ${(v.tw / 200).toFixed(0)} g -> ${(v.jw / 200).toFixed(0)} g plate waste a day, profit S$${(v.tp / 200).toFixed(2)} -> S$${(v.jp / 200).toFixed(2)}; canteen: ${(g.tw / 24000).toFixed(2)} -> ${(g.jw / 24000).toFixed(2)} kg, S$${(g.tp / 24).toFixed(2)} -> S$${(g.jp / 24).toFixed(2)}`);
 }
 
 console.log(`\n${checks} checks, ${fails} failed`);

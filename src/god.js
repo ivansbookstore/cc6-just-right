@@ -47,6 +47,7 @@
           ${gSlider('students', 'Students coming to lunch', nStudents(), ct.studentsMin, ct.studentsMax, 10, x => `${x} students`)}
           ${gSlider('smallShare', 'Just Right: Small plate, share of each Regular', P('smallShare'), 0.5, 0.9, 0.05, x => pct(x))}
           ${gSlider('discount', 'Just Right: Small plate discount', P('discount'), 0.1, 1.5, 0.05, x => money(x) + ' off')}
+          ${U.bestCaseLine()}
           <p class="muted small">Students are drawn from our customer mix: ${pct(P('shareLight'))} light eaters and ${pct(P('shareNeverLeave'))} who never leave food (from our survey of ${(window.JR_SURVEY || {}).n || 97}), plus ${pct(P('shareBig'))} with big appetites (an assumption). <button class="link small" id="god-reseed">${I('arrow-counter-clockwise')}New set of students</button></p>
         </div>
         <div class="card">
@@ -99,6 +100,7 @@
     document.querySelectorAll('#god-setup [data-st]').forEach(inp => inp.addEventListener('change', () => showSetup()));
     document.querySelectorAll('#god-setup [data-adjust]').forEach(b => b.addEventListener('click', () => { G.open[b.dataset.adjust] = !G.open[b.dataset.adjust]; showSetup(); }));
     $('#god-reseed').addEventListener('click', () => { G.seed = U.newSeed(); showSetup(); });
+    U.bindBestCase(() => showSetup());
     $('#god-reset').addEventListener('click', () => { G.edits = {}; G.open = {}; showSetup(); });
     $('#god-open-today').addEventListener('click', () => start('today'));
     $('#god-open-jr').addEventListener('click', () => start('justright'));

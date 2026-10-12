@@ -31,6 +31,8 @@ Every number lives in [`src/config.js`](src/config.js) with its source and a sta
 - **vendor**: our vendor survey (early answers, to be confirmed)
 - **assumption**: no data yet, shown as such in the game
 
+Just Right starts at our best case: a Small of 75% of Regular (150 g) at S$0.30 off. Across the tested range (Small 65% to 85%, discount S$0.20 to S$0.50) it cut the most waste without lowering vendor profit or ratings in both the one-stall and the whole-canteen model. Whether a customer takes the Small depends on the discount, using survey question 10.
+
 Change a value there, or on the in-game "How this works" screen, and both modes follow. Results are a simulation under stated assumptions, not real sales or waste data. All student-mode stall prices, portions, queues and ratings are assumptions for the game.
 
 Every new game draws a fresh queue of customers (names, lines and patience vary too). Add `?seed=123` to the address to replay a particular queue. The build number sits in the bottom-right corner; if it says "refresh", the browser is mixing an old cached copy with the new page.

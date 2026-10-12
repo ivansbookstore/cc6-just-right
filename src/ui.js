@@ -177,18 +177,32 @@
     }));
     renderSetupNote();
   }
+  // the Just Right defaults are our best case: the most waste cut without lowering profit or ratings (see config.js)
+  const isBestCase = () => ['smallShare', 'discount'].every(k => Math.abs(cfg.params[k].value - window.JR_CONFIG.defaults[k].value) < 1e-9);
+  function bestCaseLine() {
+    const D = window.JR_CONFIG.defaults;
+    return isBestCase()
+      ? `<p class="muted small">These are our best-case settings: a Small of ${pct(D.smallShare.value)} of Regular and ${money(D.discount.value)} off. In our tests they cut the most waste without lowering profit or ratings.</p>`
+      : `<p class="small"><button class="link small" id="best-case">${I('sparkle')}Back to our best-case settings (${pct(D.smallShare.value)} Small, ${money(D.discount.value)} off)</button></p>`;
+  }
+  function bindBestCase(after) {
+    const b = document.getElementById('best-case');
+    if (b) b.addEventListener('click', () => { ['smallShare', 'discount'].forEach(k => { cfg.params[k].value = window.JR_CONFIG.defaults[k].value; }); after(); });
+  }
   function renderSetupNote() {
     const be = JR.breakEvenDiscount(cfg), d = P('discount');
     let n;
     if (S.setting === 'justright') {
       const diff = be - d;
       n = `<div class="note ${diff < 0 ? 'warn' : 'good'}">Rice saved on one Small plate: <b>${money(be)}</b>. Your discount: <b>${money(d)}</b>.
-        ${diff >= 0 ? `Each Small plate earns you ${money(diff)} more than a Regular.` : `Each Small plate earns you ${money(-diff)} less than a Regular, so you need more customers or a better rating to make it up.`}</div>`;
+        ${diff >= 0 ? `Each Small plate earns you ${money(diff)} more than a Regular.` : `Each Small plate earns you ${money(-diff)} less than a Regular, so you need more customers or a better rating to make it up.`}</div>
+        ${bestCaseLine()}`;
     } else {
       const resp = P('todayLessResponse') === 'lessVeg' ? 'give less rice and add some vegetables, which is what most vendors told us they do' : 'give less rice at the same price';
       n = `<div class="note">When a student asks for less rice, you decide. Standard play is to ${resp}. Students who say nothing get a Regular plate.</div>`;
     }
     $('#setup-note').innerHTML = n;
+    bindBestCase(() => renderSetup());
   }
   document.querySelectorAll('.toggle button').forEach(b => b.addEventListener('click', () => { S.setting = b.dataset.setting; renderSetup(); }));
   $('#start-rush').addEventListener('click', () => startRush());
@@ -775,6 +789,7 @@
         <div class="card">
           <h2>The model</h2>
           <p>Every customer has a hidden appetite. They eat what they want and leave the rest, unless they are a Clean-Plater, who finishes everything and overeats instead. Taste letdowns and rushing make people leave food whatever the plate size.</p>
+          <p class="small">With Just Right, a customer whose hunger fits the Small only takes it if the discount is big enough for them. How big comes from our survey question 10: ${(() => { const q = cfg.smallDiscountNeeded; return q ? q.answers.map(([d, n]) => `${n} of 97 ${d === null ? 'would not take it' : d === 0 ? 'would take it at the same price' : 'need ' + money(d) + (d === 0.8 ? ' (our reading of "more than 50 cents")' : '')}`).join(', ') : ''; })()}. Light eaters who skip the Small can still ask for less rice, as they do today.</p>
           <p><b>Today</b> has one size: light eaters who speak up ask for less rice, quiet ones get a Regular. <b>Just Right</b> puts Regular and Small on the board, so everyone can point at the size that fits. Both use exactly the same customers, so any difference comes from the menu, not luck.</p>
           <p>Profit is takings minus rice cost minus everything else on the plate. A Small plate breaks even when the discount is no more than the rice it saves: rice cost × (1 − Small share) × (1 + cooking buffer), which is <b>${money(JR.breakEvenDiscount(cfg))}</b> with the current settings.</p>
           <p>Customers score each meal from 1 to 5 stars: up for "just nice", down for still hungry, overeating, a taste letdown, or feeling short-changed. In the shortcut, tomorrow's customers rise or fall with today's rating.</p>
@@ -817,5 +832,5 @@
     });
   }
   // shared with God Mode (src/god.js)
-  window.JR_UI = { go, getCfg: () => cfg, SND, I, money, pct, esc, newSeed, urlSeed, reduceMotion: () => RM() };
+  window.JR_UI = { go, getCfg: () => cfg, SND, I, money, pct, esc, newSeed, urlSeed, bestCaseLine, bindBestCase, reduceMotion: () => RM() };
 })();
