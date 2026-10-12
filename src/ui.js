@@ -34,18 +34,79 @@
   function stars(r) {
     const n = Math.round(r);
     let h = '';
-    for (let i = 0; i < 5; i++) h += I('star-fill', i < n ? '' : 'off');
+    for (let i = 0; i < 5; i++) h += `<span class="st" style="--i:${i}">${I('star-fill', i < n ? '' : 'off')}</span>`;
     return `<span class="stars" role="img" aria-label="${r.toFixed(1)} out of 5 stars">${h}</span>`;
   }
-  function plateSVG(grams, label, size) {
-    const R = P('regularRiceG'), w = size || 110, h = Math.round(w * 0.72);
-    const rx = grams <= 0 ? 0 : 10 + 26 * Math.sqrt(Math.min(grams, R * 1.5) / (R * 1.5));
+  const rxOf = g => { const R = P('regularRiceG'); return g <= 0 ? 0 : 10 + 26 * Math.sqrt(Math.min(g, R * 1.5) / (R * 1.5)); };
+  // fromG: draw the heap at fromG and animate it shrinking to grams (someone eating it)
+  function plateSVG(grams, label, size, fromG, quick) {
+    const w = size || 110, h = Math.round(w * 0.72);
+    const anim = fromG != null && fromG > grams;
+    const rx = rxOf(anim ? fromG : grams), to = anim && rx ? rxOf(grams) / rx : 1;
     return `<figure><svg width="${w}" height="${h}" viewBox="0 0 110 80" role="img" aria-label="${esc(label)}: ${Math.round(grams)} grams of rice">
       <ellipse cx="55" cy="46" rx="50" ry="28" fill="var(--plate)" stroke="var(--plate-edge)" stroke-width="2"/>
       <ellipse cx="55" cy="46" rx="38" ry="20" fill="none" stroke="var(--plate-edge)" stroke-width="1" opacity=".6"/>
-      ${rx ? `<ellipse cx="55" cy="${44 - rx * 0.15}" rx="${rx}" ry="${rx * 0.55}" fill="var(--rice)" stroke="var(--rice-edge)" stroke-width="1.5"/>` : ''}
+      ${rx ? `<ellipse class="heap${anim ? ' eat' + (quick ? ' quick' : '') : ''}" style="--to:${to.toFixed(3)}" cx="55" cy="${44 - rx * 0.15}" rx="${rx}" ry="${rx * 0.55}" fill="var(--rice)" stroke="var(--rice-edge)" stroke-width="1.5"/>` : ''}
     </svg><figcaption>${esc(label)}: ${Math.round(grams)} g</figcaption></figure>`;
   }
+
+  // ---------- effects: sound, floating numbers, confetti, count-ups. All motion is skipped when the device asks for reduced motion.
+  const SND = window.JR_SOUND || { play() {}, sfxOn: () => false, musicOn: () => false, setSfx() {}, setMusic() {} };
+  const RM = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const later = (ms, f) => setTimeout(f, RM() ? 0 : ms);
+  function floatText(anchor, text, bad) {
+    if (!anchor || RM()) return;
+    const r = anchor.getBoundingClientRect(), el = document.createElement('div');
+    el.className = 'floaty' + (bad ? ' bad' : ''); el.textContent = text;
+    el.style.left = (r.left + r.width / 2 + window.scrollX) + 'px'; el.style.top = (r.top + window.scrollY - 4) + 'px';
+    document.body.appendChild(el); setTimeout(() => el.remove(), 1100);
+  }
+  function bump(el) { if (!el || RM()) return; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+  function confetti(anchor, n) {
+    if (!anchor || RM()) return;
+    const r = anchor.getBoundingClientRect(), cx = r.left + r.width / 2 + window.scrollX, cy = r.top + Math.min(r.height, 120) / 2 + window.scrollY;
+    const colours = ['var(--accent)', 'var(--rice-edge)', 'var(--accent-line)', 'var(--muted)'];
+    for (let i = 0; i < (n || 28); i++) {
+      const el = document.createElement('div'), a = Math.random() * Math.PI * 2, d = 60 + Math.random() * 120;
+      el.className = 'confetti';
+      el.style.left = cx + 'px'; el.style.top = cy + 'px';
+      el.style.setProperty('--dx', Math.cos(a) * d + 'px'); el.style.setProperty('--dy', (Math.sin(a) * d - 40) + 'px');
+      el.style.setProperty('--rot', (Math.random() * 720 - 360) + 'deg'); el.style.setProperty('--c', colours[i % colours.length]);
+      document.body.appendChild(el); setTimeout(() => el.remove(), 1200);
+    }
+  }
+  function countUp(root) {
+    if (RM()) return;
+    root.querySelectorAll('[data-count]').forEach(el => {
+      const target = parseFloat(el.dataset.count), dec = +(el.dataset.dec || 0), pre = el.dataset.pre || '', suf = el.dataset.suf || '', t0 = performance.now(), dur = 800;
+      const tick = now => {
+        const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3), v = target * e;
+        el.textContent = pre + Math.abs(v).toFixed(dec) + suf;
+        if (k < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+  }
+  // a soft click on ordinary buttons; buttons with their own sound are marked data-nosound
+  document.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (b && !b.disabled && !b.closest('[data-nosound]')) SND.play('click');
+  }, true);
+  // sound and music switches
+  const bar = document.createElement('div');
+  bar.className = 'soundbar';
+  bar.innerHTML = `<button id="snd-sfx" data-nosound></button><button id="snd-music" data-nosound></button>`;
+  document.body.appendChild(bar);
+  function renderSoundbar() {
+    const sf = $('#snd-sfx'), mu = $('#snd-music');
+    sf.innerHTML = I(SND.sfxOn() ? 'speaker-high' : 'speaker-slash'); sf.setAttribute('aria-pressed', SND.sfxOn());
+    sf.setAttribute('aria-label', 'Sound effects ' + (SND.sfxOn() ? 'on' : 'off')); sf.title = sf.getAttribute('aria-label');
+    mu.innerHTML = I(SND.musicOn() ? 'music-notes' : 'music-notes-minus'); mu.setAttribute('aria-pressed', SND.musicOn());
+    mu.setAttribute('aria-label', 'Music ' + (SND.musicOn() ? 'on' : 'off')); mu.title = mu.getAttribute('aria-label');
+  }
+  $('#snd-sfx').addEventListener('click', () => { SND.setSfx(!SND.sfxOn()); renderSoundbar(); });
+  $('#snd-music').addEventListener('click', () => { SND.setMusic(!SND.musicOn()); renderSoundbar(); });
+  renderSoundbar();
 
   // ---------- static labels with icons
   $('#brandmark').innerHTML = I('bowl-food') + 'Just Right';
@@ -65,8 +126,8 @@
       <div class="row" style="gap:12px"><div class="avatar" style="width:52px;height:52px;margin:0">${I(cfg.personas[c.persona].icon)}</div>
         <div><h2>${esc(c.name)}</h2><p class="muted small" style="margin:0">One customer from today's queue, served both ways.</p></div></div>
       <div class="compare">
-        <div><b>Today</b>${plateSVG(t.leftover, 'Came back', 120)}<p class="small muted">Paid ${money(t.price)}</p></div>
-        <div><b>Just Right</b>${plateSVG(j.leftover, 'Came back', 120)}<p class="small muted">Paid ${money(j.price)}</p></div>
+        <div><b>Today</b>${plateSVG(t.leftover, 'Came back', 120, t.served)}<p class="small muted">Paid ${money(t.price)}</p></div>
+        <div><b>Just Right</b>${plateSVG(j.leftover, 'Came back', 120, j.served)}<p class="small muted">Paid ${money(j.price)}</p></div>
       </div>
       <p class="small muted" style="margin-top:10px">Model output from our survey data and stated assumptions.</p>`;
   }
@@ -171,7 +232,7 @@
     $('#feedback').className = 'feedback'; $('#feedback').innerHTML = '';
     const acts = JR.ACTIONS[set];
     const box = $('#actions');
-    box.className = 'actions n' + acts.length; box.style.display = '';
+    box.className = 'actions n' + acts.length; box.style.display = ''; box.setAttribute('data-nosound', '');
     box.innerHTML = acts.map(([k, lab], i) => {
       const price = k === 'small' ? P('regularPrice') - P('discount') : P('regularPrice');
       return `<button data-act="${k}"><span><span class="key">${i + 1}</span>${esc(lab)}</span><span class="price">${money(price)}</span></button>`;
@@ -195,25 +256,42 @@
     const c = S.rush[S.idx];
     S.actions.push(action);
     $('#actions').style.display = 'none';
-    $('#customer').style.display = 'none';
-    let html;
+    const cust = $('#customer');
+    cust.classList.remove('enter'); cust.classList.add('leaving');
+    let html, after;
     if (action === null) {
       html = `<div class="avatar gone">${I('person-simple-walk')}</div><div class="bub">${esc(c.name)} walked away.</div>
         <p class="muted">Lost sale. The queue was too slow.</p>`;
+      SND.play('walk');
+      after = () => { floatText($('#hud-rating'), 'Lost sale', true); };
     } else {
       const m = JR.meal(c, action, cfg, S.setting);
-      html = `<div class="plates">${plateSVG(m.served, 'Served')}${plateSVG(m.leftover, 'Came back')}</div>
+      html = `<div class="plates">${plateSVG(m.served, 'Served')}${plateSVG(m.leftover, 'Came back', 110, m.served)}</div>
         <div class="bub">“${esc(JR.bubble(m))}”</div>
         ${stars(m.stars)}
         <p class="muted small">Paid ${money(m.price)}${m.extraCost ? `. Extra vegetables cost you ${money(m.extraCost)}` : ''}.</p>`;
+      SND.play('serve');
+      const so = JR.runDay(cfg, S.rush.slice(0, S.idx + 1), S.setting, S.actions);
+      after = () => {
+        $('#hud-cash').textContent = money(so.revenue); bump($('#hud-cash'));
+        floatText($('#hud-cash'), '+' + money(m.price));
+        SND.play('coin');
+        later(500, () => SND.play(m.stars >= 4.3 ? 'good' : m.stars >= 3 ? 'ok' : 'bad'));
+      };
     }
     const last = S.idx + 1 >= S.rush.length;
     html += `<button class="primary btn-ic" id="next-btn" style="margin-top:10px">${last ? 'Close the stall' : 'Next customer'} <span class="kbd">(Space)</span></button>`;
-    const fb = $('#feedback');
-    fb.innerHTML = html; fb.className = 'feedback on pop';
-    $('#next-btn').addEventListener('click', next);
-    $('#next-btn').focus({ preventScroll: true });
-    S.nextTimer = setTimeout(next, action === null ? 2200 : 2600);
+    const token = S.idx;
+    later(170, () => {
+      if (S.idx !== token || !S.showing) return;      // player already moved on
+      cust.style.display = 'none'; cust.classList.remove('leaving');
+      const fb = $('#feedback');
+      fb.innerHTML = html; fb.className = 'feedback on pop';
+      $('#next-btn').addEventListener('click', next);
+      $('#next-btn').focus({ preventScroll: true });
+      after();
+    });
+    S.nextTimer = setTimeout(next, action === null ? 2400 : 2900);
   }
   function next() {
     clearTimeout(S.nextTimer);
@@ -274,9 +352,9 @@
         <h2>A full day, ${N} plates</h2>
         <p class="muted small">The same customers under both menus, served the standard way.</p>
         <div class="kpis">
-          <div class="kpi"><div class="v">${leftDrop >= 0 ? leftDrop : -leftDrop} ${leftDrop >= 0 ? 'fewer' : 'more'}</div><div class="l">plates with food left under Just Right (${T.leftFood} today, ${J.leftFood} with Just Right)</div></div>
-          <div class="kpi"><div class="v">${kg(Math.abs((T.plateWasteG + T.unsoldG) - (J.plateWasteG + J.unsoldG)))}</div><div class="l">${(J.plateWasteG + J.unsoldG) <= (T.plateWasteG + T.unsoldG) ? 'less' : 'more'} rice wasted in the day</div></div>
-          <div class="kpi"><div class="v">${money(J.profit - T.profit)}</div><div class="l">change in the vendor's profit</div></div>
+          <div class="kpi"><div class="v"><span data-count="${Math.abs(leftDrop)}">${Math.abs(leftDrop)}</span> ${leftDrop >= 0 ? 'fewer' : 'more'}</div><div class="l">plates with food left under Just Right (${T.leftFood} today, ${J.leftFood} with Just Right)</div></div>
+          <div class="kpi"><div class="v"><span data-count="${(Math.abs((T.plateWasteG + T.unsoldG) - (J.plateWasteG + J.unsoldG)) / 1000).toFixed(2)}" data-dec="2" data-suf=" kg">${kg(Math.abs((T.plateWasteG + T.unsoldG) - (J.plateWasteG + J.unsoldG)))}</span></div><div class="l">${(J.plateWasteG + J.unsoldG) <= (T.plateWasteG + T.unsoldG) ? 'less' : 'more'} rice wasted in the day</div></div>
+          <div class="kpi"><div class="v"><span data-count="${Math.abs(J.profit - T.profit).toFixed(2)}" data-dec="2" data-pre="${J.profit - T.profit < 0 ? '−' : ''}S$">${money(J.profit - T.profit)}</span></div><div class="l">change in the vendor's profit</div></div>
         </div>
         <div class="tablewrap"><table>
           <tr><th></th><th class="num">Today</th><th class="num">Just Right</th><th class="num">Change</th></tr>
@@ -347,15 +425,18 @@
     $('#r-same').addEventListener('click', () => { S.setting = other; startRush(true); });
     $('#r-new').addEventListener('click', () => { S.seed += 1; go('setup'); });
     go('report');
+    SND.play('fanfare');
+    countUp($('#report-body'));
+    if (you.rating >= 4) later(250, () => confetti($('#report-body h1'), 34));
   }
 
   // =====================================================================
   // STUDENT MODE
   // =====================================================================
-  const ST = { answers: { appetite: 'average', breakfast: 'sometimes', budget: 40 }, profile: null, week: [], weekNo: 1, dayIdx: 0,
+  const ST = { answers: { q5: 'Sometimes', breakfast: 'sometimes', budget: 40 }, real: {}, standFrom: 'start', profile: null, week: [], weekNo: 1, dayIdx: 0,
     money: 0, choices: [], cur: null, results: {} };
   const QUIZ = [
-    ['appetite', 'How much of a normal plate of rice do you usually finish?', [['light', 'About three quarters'], ['average', 'All of it'], ['big', 'All of it, and I could eat more']]],
+    ['q5', ((window.JR_SURVEY || {}).questions || {}).q5 ? window.JR_SURVEY.questions.q5.text + ' (from our survey)' : 'How often is the standard portion larger than what you need?', ['Never', 'Rarely', 'Sometimes', 'Often', 'Always'].map(x => [x, x])],
     ['breakfast', 'How often do you eat breakfast?', [['always', 'Every day'], ['sometimes', 'Some days'], ['rarely', 'Rarely']]],
     ['budget', 'Your food budget for the week', [[30, 'S$30'], [40, 'S$40'], [50, 'S$50']]],
   ];
@@ -387,16 +468,19 @@
       <span class="chip">${d.day}, day ${ST.dayIdx + 1} of 5</span><span class="spacer"></span>
       <span class="chip">${I('coins')}${money(ST.money)} left</span>`;
   }
-  function hungerBar(eaten, need) {
+  function hungerBar(eaten, need, prev) {
     const max = 1.5, w = x => Math.min(100, (x / max) * 100);
-    const r = eaten / need;
+    const r = eaten / need, r0 = prev == null || RM() ? r : prev / need;
     const state = eaten <= 0 ? 'Hungry for lunch' : r < 0.85 ? 'Still hungry' : r > 1.15 ? 'Stuffed' : 'Just right';
     return `<div class="hunger" role="meter" aria-label="Fullness" aria-valuemin="0" aria-valuemax="150" aria-valuenow="${Math.round(r * 100)}" aria-valuetext="${state}">
       <div class="zone" style="left:${w(0.85)}%;width:${w(1.15) - w(0.85)}%"></div>
-      <div class="fill ${r > 1.15 ? 'over' : ''}" style="width:${w(r)}%"></div>
+      <div class="fill ${r > 1.15 ? 'over' : ''}" style="width:${w(r0)}%" data-to="${w(r)}%"></div>
       <div class="tick" style="left:${w(1)}%"></div>
     </div><div class="hunger-legend"><span>Empty</span><span>Just right</span><span>Stuffed</span></div>
     <p class="state ${r > 1.15 ? 'worse' : r >= 0.85 ? 'better' : ''}">${state}</p>`;
+  }
+  function animateFills() {
+    document.querySelectorAll('.hunger .fill[data-to]').forEach(f => requestAnimationFrame(() => requestAnimationFrame(() => { f.style.width = f.dataset.to; })));
   }
   function renderDay() {
     sHud();
@@ -417,7 +501,8 @@
           <div class="opts">${s.options.map(o => `<button class="btn-ic" data-stall="${s.id}" data-size="${o.size}" ${o.price > ST.money + 1e-9 ? 'disabled' : ''}>
             <span>${esc(o.label)}, ${o.g} g${o.size === 'small' ? ' <span class="newtag">New</span>' : ''}</span><span class="price">${money(o.price)}</span></button>`).join('')}</div>
         </div>`).join('')}</div>
-      <p style="margin-top:12px"><button class="link" id="s-skip">Skip lunch today</button></p>`;
+      <p style="margin-top:12px"><button class="link" id="s-skip" data-nosound>Skip lunch today</button></p>`;
+    document.querySelectorAll('#s-body .opts').forEach(o => o.setAttribute('data-nosound', ''));
     document.querySelectorAll('#s-body [data-stall]').forEach(b => b.addEventListener('click', () => order(b.dataset.stall, b.dataset.size)));
     $('#s-skip').addEventListener('click', () => { ST.cur = { stall: JR.SKIP, option: JR.SKIP.options[0], eaten: 0, cap: 0 }; stopEating(); });
     window.scrollTo(0, 0);
@@ -428,36 +513,43 @@
     if (option.price > ST.money + 1e-9) return;
     ST.money = round2(ST.money - option.price);
     ST.cur = { stall, option, eaten: 0, cap: Math.min(option.g, JR.maxEatG(cfg, d, stall)) };
+    SND.play('coin');
     renderEat();
+    const chip = $('#s-hud .chip:last-child'); bump(chip); floatText(chip, '−' + money(option.price), true);
   }
   const round2 = x => Math.round(x * 100) / 100;
-  function renderEat(msg) {
+  function renderEat(msg, prevEaten) {
     sHud();
     const d = ST.week[ST.dayIdx], c = ST.cur, onPlate = c.option.g - c.eaten;
+    const prevOnPlate = prevEaten == null ? null : c.option.g - prevEaten;
     const timeLeft = d.rush ? Math.max(0, Math.round((c.cap - c.eaten) / cfg.student.biteG)) : null;
     $('#s-body').innerHTML = `
       <div class="card eat">
         <h2>${esc(c.stall.name)}: ${esc(c.option.label.toLowerCase())}, ${c.option.g} g</h2>
-        <div class="plates" style="margin:8px 0">${plateSVG(onPlate, 'On your plate', 150)}</div>
-        ${hungerBar(c.eaten, d.needG)}
+        <div class="plates${prevEaten != null && !RM() ? ' chomp' : ''}" style="margin:8px 0">${plateSVG(onPlate, 'On your plate', 150, prevOnPlate, true)}</div>
+        ${hungerBar(c.eaten, d.needG, prevEaten)}
         ${d.rush ? `<p class="small">${I('timer')} ${timeLeft} ${timeLeft === 1 ? 'minute' : 'minutes'} of eating time left.</p>` : ''}
         ${msg ? `<p class="note">${esc(msg)}</p>` : ''}
-        <div class="eat-actions">
+        <div class="eat-actions" data-nosound>
           <button class="primary btn-ic" id="bite" ${c.eaten >= c.cap - 1e-9 ? 'disabled' : ''}>${I('plus')}Take a bite <span class="kbd">(Space)</span></button>
           <button class="btn-ic" id="finish" ${c.eaten >= c.cap - 1e-9 ? 'disabled' : ''}>Finish the plate</button>
           <button class="btn-ic" id="stop">${I('check')}Stop eating <span class="kbd">(Enter)</span></button>
         </div>
       </div>`;
     $('#bite').addEventListener('click', bite);
-    $('#finish').addEventListener('click', () => { c.eaten = c.cap; afterBite(); });
+    $('#finish').addEventListener('click', () => { const prev = c.eaten; c.eaten = c.cap; SND.play('bite'); later(120, () => SND.play('bite')); afterBite(prev); });
     $('#stop').addEventListener('click', stopEating);
+    animateFills();
   }
-  function bite() { const c = ST.cur; if (!c) return; c.eaten = Math.min(c.cap, c.eaten + cfg.student.biteG); afterBite(); }
-  function afterBite() {
+  function bite() { const c = ST.cur; if (!c) return; const prev = c.eaten; c.eaten = Math.min(c.cap, c.eaten + cfg.student.biteG); SND.play('bite'); afterBite(prev); }
+  function afterBite(prev) {
     const d = ST.week[ST.dayIdx], c = ST.cur;
-    if (c.eaten >= c.cap - 1e-9 && c.cap < c.option.g) return renderEat(d.rush ? 'Time is up. Class starts, so you leave the rest.' : '');
-    if (c.eaten >= c.option.g - 1e-9) return renderEat('Plate finished.');
-    renderEat();
+    const r0 = prev / d.needG, r1 = c.eaten / d.needG;
+    if (r0 < 0.85 && r1 >= 0.85 && r1 <= 1.15) later(90, () => SND.play('full'));
+    if (r0 <= 1.15 && r1 > 1.15) later(90, () => SND.play('bad'));
+    if (c.eaten >= c.cap - 1e-9 && c.cap < c.option.g) return renderEat(d.rush ? 'Time is up. Class starts, so you leave the rest.' : '', prev);
+    if (c.eaten >= c.option.g - 1e-9) return renderEat('Plate finished.', prev);
+    renderEat('', prev);
   }
   function stopEating() {
     const d = ST.week[ST.dayIdx], c = ST.cur;
@@ -474,15 +566,22 @@
         <div class="plates" style="margin:8px 0">${plateSVG(meal.left, 'Left on the plate', 130)}</div>
         <p class="bub" style="font-size:19px;font-weight:620;text-align:center">${esc(pm.text)}</p>
         <div class="kpis k3">
-          <div class="kpi"><div class="v">${pct(meal.ratio)}</div><div class="l">of what you needed</div></div>
-          <div class="kpi"><div class="v">${Math.round(meal.left)} g</div><div class="l">rice left</div></div>
-          <div class="kpi"><div class="v">${pm.focus}</div><div class="l">focus out of 100</div></div>
+          <div class="kpi"><div class="v"><span data-count="${Math.round(meal.ratio * 100)}" data-suf="%">${pct(meal.ratio)}</span></div><div class="l">of what you needed</div></div>
+          <div class="kpi"><div class="v"><span data-count="${Math.round(meal.left)}" data-suf=" g">${Math.round(meal.left)} g</span></div><div class="l">rice left</div></div>
+          <div class="kpi"><div class="v"><span data-count="${pm.focus}">${pm.focus}</span></div><div class="l">focus out of 100</div></div>
         </div>
         ${pm.snack ? `<p class="muted small">Snack: ${money(pm.snack)}.</p>` : ''}
         <button class="primary" id="s-next" style="width:100%;margin-top:10px">${last ? 'See your week' : 'Next day'} <span class="kbd">(Space)</span></button>
       </div>`;
     $('#s-next').addEventListener('click', nextDay);
     $('#s-next').focus({ preventScroll: true });
+    countUp($('#s-body'));
+    later(150, () => {
+      if (c.stall.id === 'skip' || meal.fullness === 'hungry') SND.play('sad');
+      else if (meal.fullness === 'stuffed') SND.play('bad');
+      else { SND.play('good'); confetti($('#s-body .bub'), 22); }
+      if (pm.snack) { const chip = $('#s-hud .chip:last-child'); bump(chip); floatText(chip, '−' + money(pm.snack), true); }
+    });
   }
   function nextDay() {
     if (ST.dayIdx < 4) { ST.dayIdx++; renderDay(); return; }
@@ -522,10 +621,9 @@
         <div class="card"><h2>Week ${w2 ? 2 : 1}, day by day</h2><div class="tablewrap"><table>
           <tr><th>Day</th><th>Where</th><th class="num">Left</th><th>Afterwards</th></tr>${dayList(w2 || w1)}</table></div></div>
         <div class="card">${w2 ? `
-          <h2>Now the real you</h2>
-          <p>Of your last 5 canteen meals, on how many did you leave rice or noodles?</p>
-          <div class="choices" id="real-you">${[0, 1, 2, 3, 4, 5].map(n => `<button class="choice" data-n="${n}">${n}</button>`).join('')}</div>
-          <p class="muted small" id="real-you-out">Nothing you tap here is saved or sent.</p>` : `
+          <h2>Where you stand</h2>
+          <p>Answer some of our real survey questions and see how you compare with ${SV.n} NTU students. Your game week is on there too.</p>
+          <button class="primary btn-ic" id="s-stand-card">${I('users')}See where you stand</button>` : `
           <h2>Try the same week again</h2>
           <p>Same days, same appetite, same budget. This time the Just Right stall also sells a Small plate for ${money(P('regularPrice') - P('discount'))}.</p>
           <p class="muted small">Not every leftover is about size. A rushed lunch or a long queue still costs you.</p>`}
@@ -533,6 +631,7 @@
       </div>
       <div class="actionsbar">
         ${w2 ? `<button class="primary btn-ic" id="s-again">${I('arrow-counter-clockwise')}Play the week again</button>` : `<button class="primary btn-ic" id="s-week2">${I('arrow-counter-clockwise')}Replay with Just Right</button>`}
+        ${w2 ? '' : `<button class="btn-ic" id="s-stand-btn">${I('users')}Where you stand</button>`}
         <button class="btn-ic" id="s-new">${I('calendar-plus')}New answers</button>
         <button class="btn-ic" data-go="how">${I('question')}How this works</button>
         <button class="btn-ic" data-go="start">${I('house')}Home</button>
@@ -540,13 +639,97 @@
     if ($('#s-week2')) $('#s-week2').addEventListener('click', () => startWeek(2));
     if ($('#s-again')) $('#s-again').addEventListener('click', () => { ST.results = {}; startWeek(1); });
     $('#s-new').addEventListener('click', () => { renderQuiz(); go('s-setup'); });
-    document.querySelectorAll('#real-you .choice').forEach(b => b.addEventListener('click', () => {
-      document.querySelectorAll('#real-you .choice').forEach(x => x.classList.toggle('sel', x === b));
-      const n = Number(b.dataset.n);
-      $('#real-you-out').textContent = `You said ${n} of 5 in real life. In the game you left food on ${w1.leftMeals} of 5 days in week 1 and ${w2.leftMeals} of 5 in week 2. Nothing you tap here is saved or sent.`;
-    }));
+    ['#s-stand-card', '#s-stand-btn'].forEach(id => { if ($(id)) $(id).addEventListener('click', () => openStand('s-report')); });
     go('s-report');
+    SND.play('fanfare');
+    countUp($('#s-report-body'));
+    if (w2 && (w2.leftMeals < w1.leftMeals || w2.right > w1.right)) later(250, () => confetti($('#s-report-body h1'), 34));
   }
+
+
+  // =====================================================================
+  // WHERE YOU STAND: the player's answers against our real survey (counts only, nothing saved or sent)
+  // =====================================================================
+  const SV = window.JR_SURVEY || { n: 0, questions: {} };
+  const STAND_QS = ['q2', 'q3', 'q4', 'q6', 'q8', 'q10', 'q11', 'q1'];
+  const SCALE_WORDS = {
+    q2: ['leave food less often than you', 'leave food more often than you'],
+    q5: ['find the portion too big less often than you', 'find the portion too big more often than you'],
+    q6: ['are less likely than you to choose a smaller, cheaper portion', 'are more likely than you to choose it'],
+  };
+  const gameBucket = left => left <= 0 ? 'Never' : left === 1 ? 'Rarely' : left <= 3 ? 'Sometimes' : left === 4 ? 'Often' : 'Always';
+  $('#stand-link').innerHTML = I('users') + `Compare yourself with ${SV.n} NTU students`;
+  $('#stand-link').addEventListener('click', () => openStand('start'));
+  $('#stand-back').addEventListener('click', () => go(ST.standFrom));
+  function openStand(from) {
+    ST.standFrom = from;
+    $('#stand-back').innerHTML = I('arrow-left') + (from === 's-report' ? 'Back to your week' : 'Home');
+    if (ST.profile && ST.profile.q5 && !ST.real.q5) ST.real.q5 = ST.profile.q5;
+    renderStand(); go('s-stand');
+  }
+  function bars(q, mine, gameMark) {
+    const max = Math.max(...q.options.map(o => o[1]), 1), sel = [].concat(mine == null ? [] : mine);
+    return `<div class="sbars">${q.options.map(([lab, n]) => {
+      const me = sel.includes(lab), game = gameMark === lab;
+      return `<div class="srow${me ? ' me' : ''}${game ? ' game' : ''}"><span class="slab">${esc(q.low && lab === '1' ? '1 ' + q.low : q.high && lab === '5' ? '5 ' + q.high : lab)}${me ? ' <span class="youtag">You</span>' : ''}${game ? ' <span class="youtag game">Your game week</span>' : ''}</span>
+        <span class="sbar"><i style="width:${(n / max) * 100}%"></i></span><span class="snum">${n} <span class="muted">(${pct(n / SV.n)})</span></span></div>`;
+    }).join('')}</div>`;
+  }
+  function sentence(key, q, mine) {
+    if (mine == null || (Array.isArray(mine) && !mine.length)) return '';
+    if (q.kind === 'multi') return mine.map(m => { const n = (q.options.find(o => o[0] === m) || [, 0])[1]; return `${esc(m)}: ${n} of ${SV.n} (${pct(n / SV.n)}) ticked this too.`; }).join(' ');
+    const i = q.options.findIndex(o => o[0] === mine), same = q.options[i][1];
+    if (q.kind === 'scale') {
+      const lower = q.options.slice(0, i).reduce((a, o) => a + o[1], 0), higher = q.options.slice(i + 1).reduce((a, o) => a + o[1], 0);
+      const w = SCALE_WORDS[key] || ['answered lower', 'answered higher'];
+      const parts = [lower ? `${pct(lower / SV.n)} ${w[0]}` : '', higher ? `${pct(higher / SV.n)} ${w[1]}` : ''].filter(Boolean);
+      const edge = !lower ? ' Nobody answered lower.' : !higher ? ' Nobody answered higher.' : '';
+      return `${same} of ${SV.n} (${pct(same / SV.n)}) gave the same answer. ${parts.join('; ')}.${edge}`;
+    }
+    const top = Math.max(...q.options.map(o => o[1]));
+    return `${same} of ${SV.n} (${pct(same / SV.n)}) chose the same as you.${same === top ? ' That is the most common answer.' : ''}`;
+  }
+  function standCard(key, interactive) {
+    const q = SV.questions[key]; if (!q) return '';
+    const mine = ST.real[key];
+    const opts = q.options.map(o => o[0]);
+    const isSel = o => q.kind === 'multi' ? (mine || []).includes(o) : mine === o;
+    return `<div class="card standcard" data-q="${key}">
+      <h3 style="margin-top:0">${esc(q.text)}</h3>
+      ${interactive ? `<div class="choices">${opts.map(o => `<button class="choice${isSel(o) ? ' sel' : ''}" data-k="${key}" data-v="${esc(o)}" aria-pressed="${isSel(o)}">${esc(q.low && o === '1' ? '1 ' + q.low : q.high && o === '5' ? '5 ' + q.high : o)}</button>`).join('')}</div>` : ''}
+      ${mine != null && !(Array.isArray(mine) && !mine.length) ? `${bars(q, mine)}<p class="small" style="margin:8px 0 0">${sentence(key, q, mine)}</p>` : `<p class="muted small" style="margin:8px 0 0">${q.kind === 'multi' ? 'Tick all that apply to see how others answered.' : 'Tap your answer to see how others answered.'}</p>`}
+    </div>`;
+  }
+  function renderStand() {
+    const res = ST.results[2] || ST.results[1];
+    const gameCard = res ? (() => {
+      const b = gameBucket(res.leftMeals), q = SV.questions.q2;
+      return `<div class="card standcard">
+        <h3 style="margin-top:0">Your game week</h3>
+        <p class="small">You left food on <b>${res.leftMeals} of 5</b> days in week ${ST.results[2] ? 2 : 1}. We read that as "${b}" on question 2 (0 days Never, 1 Rarely, 2 to 3 Sometimes, 4 Often, 5 Always: our mapping).</p>
+        ${bars(q, null, b)}
+      </div>`;
+    })() : '';
+    $('#s-stand-body').innerHTML = `
+      <div class="report-head"><h1 style="font-size:clamp(32px,5vw,46px)">Where you stand</h1>
+        <p class="lede">Your answers next to ${SV.n} NTU students who took our survey (${esc(SV.collected)}). Nothing you tap is saved or sent.</p></div>
+      <div class="stands">
+        ${standCard('q5', true)}
+        ${gameCard}
+        ${STAND_QS.map(k => standCard(k, true)).join('')}
+      </div>
+      <p class="muted small" style="margin-top:12px">Counts from our Google Form. Questions with several answers count every box ticked, so they add up to more than ${SV.n}.</p>`;
+  }
+  // one listener for every answer button; a tapped card is rebuilt with the bars
+  $('#s-stand-body').addEventListener('click', e => {
+    const b = e.target.closest('.choice'); if (!b) return;
+    const k = b.dataset.k, v = b.dataset.v, q = SV.questions[k];
+    if (q.kind === 'multi') { const cur = new Set(ST.real[k] || []); cur.has(v) ? cur.delete(v) : cur.add(v); ST.real[k] = q.options.map(o => o[0]).filter(o => cur.has(o)); }
+    else ST.real[k] = v;
+    b.closest('.standcard').outerHTML = standCard(k, true);
+    const fresh = document.querySelector(`#s-stand-body .standcard[data-q="${k}"] .sbars`);
+    if (fresh) fresh.classList.add('grow-in');
+  });
 
   // ---------- how this works
   function fmtVal(p) {
@@ -594,12 +777,14 @@
       </div>
       <div class="card" style="margin-top:12px">
         <h2>Student mode</h2>
-        <p class="small">You have a hidden appetite: ${Object.entries(cfg.student.appetite).map(([k, x]) => `${k} ${pct(x)}`).join(', ')} of a Regular plate. Breakfast changes it: skipped ${pct(cfg.student.breakfastEffect.skipped)}, normal ${pct(cfg.student.breakfastEffect.normal)}, big ${pct(cfg.student.breakfastEffect.big)}. A lunch is just right between 85% and 115% of what you need; below that you are still hungry and buy a ${money(cfg.student.snackPrice)} snack if you can; above it you are stuffed, which hurts most on a 2 pm lecture day. On Thursday you have ${cfg.student.rushWindowMin} minutes for lunch, so a long queue leaves less time to eat.</p>
+        <p class="small">Your answer to our survey question on portion size sets your hidden appetite: ${Object.entries(cfg.student.appetiteFromQ5).map(([k, x]) => `${k} ${pct(x)}`).join(', ')} of a Regular plate (our mapping, not data). Breakfast changes it: skipped ${pct(cfg.student.breakfastEffect.skipped)}, normal ${pct(cfg.student.breakfastEffect.normal)}, big ${pct(cfg.student.breakfastEffect.big)}. A lunch is just right between 85% and 115% of what you need; below that you are still hungry and buy a ${money(cfg.student.snackPrice)} snack if you can; above it you are stuffed, which hurts most on a 2 pm lecture day. On Thursday you have ${cfg.student.rushWindowMin} minutes for lunch, so a long queue leaves less time to eat.</p>
         <div class="tablewrap"><table>
           <tr><th>Stall</th><th class="num">Plate</th><th class="num">Price</th><th class="num">Queue</th><th class="num">Stars</th></tr>
           ${JR.studentStalls(cfg, 2).map(x => `<tr><td>${esc(x.name)}</td><td class="num">${x.options.map(o => o.g + ' g').join(', ')}</td><td class="num">${x.options.map(o => money(o.price)).join(', ')}</td><td class="num">${x.queueMin} min</td><td class="num">${x.stars.toFixed(1)}</td></tr>`).join('')}
         </table></div>
         <p class="muted small">All student-mode numbers are assumptions for the game, not survey data. The Standard and Just Right use the vendor settings below, so both modes agree.</p>
+        <h3>Where you stand</h3>
+        <p class="small">That screen compares your own answers with ${SV.n} NTU students who answered our Google Form (${esc(SV.collected)}). It shows counts only, with no individual responses, and nothing you tap is saved or sent. Your game week is placed on question 2 by days with food left: 0 Never, 1 Rarely, 2 to 3 Sometimes, 4 Often, 5 Always (our mapping).</p>
       </div>
       <div class="card" style="margin-top:12px">
         <h2>Every number</h2>

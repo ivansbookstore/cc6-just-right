@@ -7,7 +7,7 @@
 <meta name="description" content="Just Right: a canteen portion simulation for NTU vendors and students (CC0006 group project).">
 <title>Just Right</title>
 <link rel="preload" href="fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=0.4">
 </head>
 <body>
 <main class="wrap">
@@ -23,7 +23,7 @@
           <button class="card mode primary" id="go-vendor"></button>
           <button class="card mode" id="go-student"></button>
         </div>
-        <p><button class="link" data-go="how" id="how-link"></button></p>
+        <p style="display:flex;flex-direction:column;align-items:flex-start;gap:2px"><button class="link" id="stand-link"></button><button class="link" data-go="how" id="how-link"></button></p>
       </div>
       <div class="card preview" id="preview" aria-live="polite"></div>
     </div>
@@ -99,6 +99,12 @@
     <div id="s-report-body"></div>
   </section>
 
+  <!-- STUDENT: WHERE YOU STAND -->
+  <section id="s-stand" class="screen">
+    <button class="link" id="stand-back"></button>
+    <div id="s-stand-body"></div>
+  </section>
+
   <!-- HOW -->
   <section id="how" class="screen">
     <button class="link" data-go="back" id="back-how"></button>
@@ -107,9 +113,11 @@
 
   <footer>Just Right is a CC0006 Sustainability group project at NTU, open source under the MIT licence. It is a simulation built on our survey data and stated assumptions, not real sales data.</footer>
 </main>
-<script src="src/config.js"></script>
-<script src="src/engine.js"></script>
-<script src="src/icons.js"></script>
-<script src="src/ui.js"></script>
+<script src="src/config.js?v=0.4"></script>
+<script src="src/engine.js?v=0.4"></script>
+<script src="src/icons.js?v=0.4"></script>
+<script src="src/survey.js?v=0.4"></script>
+<script src="src/sound.js?v=0.4"></script>
+<script src="src/ui.js?v=0.4"></script>
 </body>
 </html>

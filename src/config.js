@@ -1,5 +1,5 @@
 /* Just Right: every number the game uses, with where it came from.
-   status: "survey"     = from our student survey (wave 1, n = 22)
+   status: "survey"     = from our student survey (97 responses, 1 to 7 October 2026)
            "vendor"     = from our vendor survey: confirm before quoting
            "assumption" = no data yet; flagged in the game
    Change values here (or on the "How this works" screen): nothing else needs editing. */
@@ -23,20 +23,20 @@
       rushCustomers:  { label: 'Customers you serve in the lunch rush', value: 20, unit: '', min: 10, max: 30, step: 1, source: 'Game length, not data', status: 'assumption' },
       patienceSec:    { label: 'Seconds a customer waits before walking away', value: 12, unit: 's', min: 6, max: 30, step: 1, source: 'Game difficulty, not data', status: 'assumption' },
       chooseRightSize:{ label: 'Customers near the line who pick the size that fits them', value: 0.80, unit: '%', min: 0.5, max: 1, step: 0.05, source: 'No data. The pilot will measure this', status: 'assumption', editable: true },
-      shareLight:     { label: 'Light eaters (leave food: portion too large / not hungry)', value: 15 / 22, unit: '%', source: 'Student survey wave 1, Q2 + Q4: 15 of 22', status: 'survey' },
-      shareNeverLeave:{ label: 'Never leave food', value: 4 / 22, unit: '%', source: 'Student survey wave 1, Q2: 4 of 22', status: 'survey' },
-      sharePicky:     { label: 'Leave food mainly over taste', value: 3 / 22, unit: '%', source: 'Student survey wave 1, Q4: 3 of 22', status: 'survey' },
+      shareLight:     { label: 'Light eaters (leave food: portion too large / not hungry)', value: 65 / 97, unit: '%', source: 'Student survey (97 responses), Q2 + Q4: 65 of 97', status: 'survey' },
+      shareNeverLeave:{ label: 'Never leave food', value: 23 / 97, unit: '%', source: 'Student survey (97 responses), Q2: 23 of 97', status: 'survey' },
+      sharePicky:     { label: 'Leave food mainly over taste', value: 9 / 97, unit: '%', source: 'Student survey (97 responses), Q2 + Q4: 9 of 97', status: 'survey' },
       shareBig:       { label: 'Big eaters (added on top, others scaled down)', value: 0.10, unit: '%', min: 0, max: 0.3, step: 0.05, source: 'No survey question asks this', status: 'assumption', editable: true },
-      lightSpeakUp:   { label: 'Light eaters who ask for less rice', value: 0.50, unit: '%', min: 0, max: 1, step: 0.05, source: 'No data. 5 of 22 say they cannot choose their portion', status: 'assumption', editable: true },
+      lightSpeakUp:   { label: 'Light eaters who ask for less rice', value: 0.50, unit: '%', min: 0, max: 1, step: 0.05, source: 'No data. 21 of 97 say they cannot choose their portion', status: 'assumption', editable: true },
       neverLeaveCleanPlater: { label: 'Of those who never leave food, share who finish even when full', value: 0.50, unit: '%', source: 'No data', status: 'assumption' },
-      rusherShare:    { label: 'Chance a customer is rushing at this meal', value: 0.10, unit: '%', source: 'No data. 4 of 22 name time as one reason they leave food (not every meal)', status: 'assumption' },
+      rusherShare:    { label: 'Chance a customer is rushing at this meal', value: 0.10, unit: '%', source: 'No data. 10 of 97 name time as one reason they leave food (not every meal)', status: 'assumption' },
       rushEatCap:     { label: 'Most a rusher can eat, as a share of Regular', value: 0.70, unit: '%', source: 'No data', status: 'assumption' },
       budgetShare:    { label: 'Budget-minded customers', value: 0.30, unit: '%', source: 'No data', status: 'assumption' },
       tasteLetdownPicky: { label: 'Chance the food disappoints a picky eater', value: 0.40, unit: '%', source: 'No data', status: 'assumption' },
-      tasteLetdownOther: { label: 'Chance the food disappoints anyone else', value: 0.05, unit: '%', source: 'No data. 11 of 22 name taste as one reason they leave food', status: 'assumption' },
+      tasteLetdownOther: { label: 'Chance the food disappoints anyone else', value: 0.05, unit: '%', source: 'No data. 46 of 97 name taste as one reason they leave food', status: 'assumption' },
       ratingSensitivity: { label: 'Change in tomorrow\'s customers per star of rating difference', value: 0.30, unit: '%', source: 'No data. Illustrates how ratings drive customers', status: 'assumption' },
     },
-    calibration: 'Check against the survey: in the model about 4 in 10 Today meals leave food (42% over 40 simulated days). Our rough reading of the survey (4 Never, 6 Rarely, 9 Sometimes, 3 Often out of 22, taking Rarely ≈ 15%, Sometimes ≈ 40%, Often ≈ 70% of meals) gives about 30%. So the model may overstate today\'s waste, and the waste Just Right saves, somewhat. The plate-waste photo audit should replace these appetite ranges.',
+    calibration: 'Check against the survey: in the model about 4 in 10 Today meals leave food (39% over 40 simulated days). Our survey of 97 students (23 Never, 23 Rarely, 41 Sometimes, 10 Often, 0 Always) gives about 28% if Rarely means about 15% of meals, Sometimes 40% and Often 70%. That conversion is our assumption, and it suggests the model overstates today\'s waste, and so the waste Just Right saves. The plate-waste photo audit should replace these appetite ranges.',
     personas: {
       light:  { name: 'The Light Eater', icon: 'feather', appetite: [0.80, 1.15], line: 'Auntie, less rice can?', jrLine: 'One Small, please.' },
       quiet:  { name: 'The Quiet One', icon: 'hand-pointing', appetite: [0.80, 1.15], line: '(points at the dish, says nothing)', jrLine: '(points at Small on the board)' },
@@ -51,6 +51,8 @@
     student: {
       biteG: 20,
       appetite: { light: 0.80, average: 1.00, big: 1.25 },          // share of a Regular plate. Assumption.
+      // a student's own answer to our survey question 5 sets their game appetite. The mapping is our assumption.
+      appetiteFromQ5: { Never: 1.20, Rarely: 1.00, Sometimes: 0.90, Often: 0.80, Always: 0.75 },
       breakfastEffect: { skipped: 1.15, normal: 1.00, big: 0.85 },   // hunger at lunch. Assumption.
       budgets: [30, 40, 50], defaultBudget: 40,                       // S$ for the week. Assumption.
       snackPrice: 4.00,                                               // bubble tea at 4 pm. Assumption.

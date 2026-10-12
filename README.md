@@ -17,13 +17,15 @@ Because both settings use exactly the same customers, any difference comes from 
 
 **Be the vendor.** Serve a 20-customer lunch rush at an economy rice stall. Each customer has a hidden appetite and a line of speech; you choose how to serve them before they lose patience. The closing report compares Today and Just Right for a full day of 80 plates (environment, society, economy), shows what your own play did, and runs a three-day "shortcut" where the vendor quietly shrinks every plate, to show how ratings drop.
 
-**Be the student.** Answer three questions (how much you usually finish, how often you eat breakfast, your weekly budget), then eat lunch Monday to Friday. Pick a stall, eat bite by bite while a hunger bar fills, and stop when you like. Stopping too early leaves you hungry; finishing a big plate can leave you stuffed in a 2 pm lecture; leaving rice wastes food. Then replay the same week with a Small plate at the Just Right stall and compare.
+**Be the student.** Answer three questions (our survey question on whether the standard portion is too big for you, how often you eat breakfast, your weekly budget), then eat lunch Monday to Friday. Pick a stall, eat bite by bite while a hunger bar fills, and stop when you like. Stopping too early leaves you hungry; finishing a big plate can leave you stuffed in a 2 pm lecture; leaving rice wastes food. Then replay the same week with a Small plate at the Just Right stall and compare.
+
+**Where you stand.** From the home screen or the end of your week, answer our real survey questions as yourself and see how you compare with the 97 NTU students who answered it: a bar chart per question with your answer highlighted, and your game week placed on the "how often do you leave food" question. It uses counts only ([`src/survey.js`](src/survey.js)); nothing you tap is saved or sent.
 
 ## Where the numbers come from
 
 Every number lives in [`src/config.js`](src/config.js) with its source and a status:
 
-- **survey**: our NTU student survey (wave 1, 22 responses)
+- **survey**: our NTU student survey (97 responses, 1 to 7 October 2026)
 - **vendor**: our vendor survey (early answers, to be confirmed)
 - **assumption**: no data yet, shown as such in the game
 
@@ -45,10 +47,18 @@ css/style.css           layout for phone and computer, light and dark mode
 fonts/                  Geist (SIL Open Font License, see GEIST-OFL.txt)
 src/config.js           every number, with source and status
 src/engine.js           the model: customers, meals, ratings, profit, the student week (no screen code)
+src/survey.js           student survey answer counts (97 responses, no individual rows)
 src/icons.js            Phosphor Icons (MIT)
+src/sound.js            sound effects and music, synthesised in the browser
 src/ui.js               screens and controls
 tests/                  tests and audits
 ```
+
+## Sound and motion
+
+- Sound effects and a quiet background tune are made live in the browser with the Web Audio API (`src/sound.js`), so there are no audio files and nothing to license.
+- The two round buttons at the top right switch sound effects and music on or off. Music starts off; the choice is remembered on that device.
+- Animations explain what happened: customers arrive and leave, the rice on a returned plate shrinks to what was left, stars pop in, coins float up. Devices set to reduce motion get no animation.
 
 ## Controls
 

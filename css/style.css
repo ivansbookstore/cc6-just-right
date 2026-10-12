@@ -248,3 +248,64 @@ fieldset.quiz legend { font-weight: 600; margin-bottom: 8px; padding: 0; }
 .kpis.k3 .kpi:first-child { grid-column: auto; }
 .kpis.k3 .v { font-size: 22px; }
 .newtag { font-size: 12px; font-weight: 620; padding: 1px 8px; border-radius: var(--r-tag); background: var(--accent-soft); color: var(--accent); margin-left: 4px; }
+
+/* ---------- motion and effects. Every animation explains something: arrival, leaving, eating, earning, scoring.
+   z-index scale: 30 floating effects, 40 sound switches. */
+.wrap { padding-top: 60px; }
+.soundbar { position: fixed; top: 10px; right: 12px; display: flex; gap: 6px; z-index: 40; }
+.soundbar button { min-height: 40px; width: 40px; padding: 0; border-radius: var(--r-tag); display: grid; place-items: center; background: var(--surface); box-shadow: var(--shadow); }
+.soundbar button[aria-pressed="false"] { color: var(--muted); }
+.soundbar .ic { width: 20px; height: 20px; }
+.floaty { position: absolute; transform: translate(-50%, 0); font-weight: 700; font-size: 15px; color: var(--accent); pointer-events: none; z-index: 30; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.floaty.bad { color: var(--bad); }
+.confetti { position: absolute; width: 7px; height: 11px; border-radius: 2px; pointer-events: none; z-index: 30; background: var(--c); }
+.stars .st { display: inline-flex; }
+@media (prefers-reduced-motion: no-preference) {
+  .customer.enter { animation: slideIn .38s var(--ease); }
+  .customer.enter .avatar { animation: hop .55s var(--ease) .05s both; }
+  .customer.leaving { animation: slideOut .17s ease-in forwards; }
+  .heap.eat { transform-box: fill-box; transform-origin: center; animation: eat .9s var(--ease) .4s both; }
+  .heap.eat.quick { animation-duration: .3s; animation-delay: 0s; }
+  .stars .st { animation: starPop .34s var(--ease) both; animation-delay: calc(.5s + var(--i) * .08s); }
+  .patience.low > div { animation: pulse .45s ease-in-out infinite alternate; }
+  .bump { animation: bump .38s var(--ease); }
+  .bar { transform-origin: left center; animation: grow .9s var(--ease) both; }
+  .plates.chomp figure { animation: chomp .24s ease; }
+  .mode, .stallcard { transition: transform .2s var(--ease), box-shadow .2s, border-color .2s; }
+  .mode:not(:disabled):hover, .stallcard:hover { transform: translateY(-2px); }
+  .floaty { animation: floatUp 1s var(--ease) forwards; }
+  .confetti { animation: confetti 1.15s cubic-bezier(.2, .7, .3, 1) forwards; }
+  .brandmark .ic { animation: steam 3s ease-in-out infinite; transform-origin: bottom center; }
+  .kpi { animation: enter .45s var(--ease) both; }
+  .kpi:nth-child(2) { animation-delay: .08s; } .kpi:nth-child(3) { animation-delay: .16s; }
+}
+@keyframes slideIn { from { opacity: 0; transform: translateX(36px); } to { opacity: 1; transform: none; } }
+@keyframes slideOut { to { opacity: 0; transform: translateX(-36px); } }
+@keyframes hop { 0% { transform: translateY(10px) scale(.9); } 60% { transform: translateY(-5px) scale(1.05); } 100% { transform: none; } }
+@keyframes eat { from { transform: scale(1); } to { transform: scale(var(--to)); } }
+@keyframes starPop { from { opacity: 0; transform: scale(.3) rotate(-25deg); } to { opacity: 1; transform: none; } }
+@keyframes pulse { from { opacity: 1; } to { opacity: .4; } }
+@keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.15); } 100% { transform: scale(1); } }
+@keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes chomp { 0% { transform: scale(1); } 45% { transform: scale(.95) rotate(-2deg); } 100% { transform: scale(1); } }
+@keyframes floatUp { 0% { opacity: 0; transform: translate(-50%, 6px); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -40px); } }
+@keyframes confetti { from { transform: translate(0, 0) rotate(0); opacity: 1; } to { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; } }
+@keyframes steam { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+
+/* ---------- where you stand */
+.stands { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); align-items: start; }
+.standcard h3 { font-size: 17px; line-height: 1.35; }
+.standcard .choices { margin: 8px 0 4px; }
+.sbars { display: grid; gap: 6px; margin-top: 10px; }
+.srow { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 14px; padding: 4px 6px; border-radius: 8px; }
+.srow.me, .srow.game { background: var(--accent-soft); font-weight: 600; }
+.slab { min-width: 0; overflow-wrap: anywhere; }
+.sbar { height: 10px; }
+.sbar i { display: block; height: 100%; border-radius: var(--r-tag); background: var(--muted); opacity: .45; min-width: 2px; }
+.srow.me .sbar i, .srow.game .sbar i { background: var(--accent); opacity: 1; }
+.snum { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.youtag { display: inline-block; font-size: 11px; font-weight: 650; padding: 1px 8px; border-radius: var(--r-tag); background: var(--accent); color: var(--accent-ink); vertical-align: 1px; }
+@media (max-width: 520px) { .srow { grid-template-columns: 1fr auto; } .sbar { grid-column: 1 / -1; grid-row: 2; } }
+@media (prefers-reduced-motion: no-preference) {
+  .sbars.grow-in .sbar i { transform-origin: left center; animation: grow .6s var(--ease) both; }
+}

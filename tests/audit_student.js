@@ -19,6 +19,20 @@ console.log('1. Set-up and the week');
     ok(w1.length === 5 && w1.every(d => d.needG > 0), `${a}/${h}: five days, positive hunger`);
     ok(w1.filter(d => d.rush).length === 1 && w1.filter(d => d.lecture).length === 2, `${a}/${h}: one rush day, two lecture days`);
   }
+
+  // the game's set-up now asks survey question 5; each answer must map to an appetite
+  for (const q5 of Object.keys(cfg.student.appetiteFromQ5)) {
+    const pr = JR.studentProfile(cfg, { q5, breakfast: 'sometimes', budget: 40 });
+    ok(pr.q5 === q5 && pr.appetite === cfg.student.appetiteFromQ5[q5], `Q5 ${q5}: appetite ${pr.appetite}`);
+  }
+  const order = ['Never', 'Rarely', 'Sometimes', 'Often', 'Always'].map(k => cfg.student.appetiteFromQ5[k]);
+  ok(order.every((x, i) => i === 0 || x < order[i - 1]), 'Q5: the more often the portion is too big, the smaller the appetite');
+  const SV = require('../src/survey.js');
+  ok(Object.keys(cfg.student.appetiteFromQ5).join() === SV.questions.q5.options.map(o => o[0]).join(), 'Q5 answers in the game match the survey options');
+  for (const [k, q] of Object.entries(SV.questions)) {
+    const tot = q.options.reduce((a, o) => a + o[1], 0);
+    ok(q.kind === 'multi' ? tot >= SV.n : tot === SV.n, `survey ${k}: counts add up (${tot} of ${SV.n})`);
+  }
 }
 
 console.log('2. Stalls');
@@ -90,11 +104,12 @@ function play(profile, weekNo, strat) {
   return JR.runStudentWeek(cfg, profile, weekNo, choices);
 }
 
-console.log('4. Simulated players: every appetite, breakfast habit and budget');
+console.log('4. Simulated players: every appetite (old set-up and survey Q5 answers), breakfast habit and budget');
 {
   const rows = [];
-  for (const a of APPS) for (const h of HABITS) for (const b of BUDGETS) {
-    const pr = JR.studentProfile(cfg, { appetite: a, breakfast: h, budget: b });
+  const ANS = [...APPS.map(a => ({ a, ans: { appetite: a } })), ...Object.keys(cfg.student.appetiteFromQ5).map(q => ({ a: 'Q5 ' + q, ans: { q5: q } }))];
+  for (const { a, ans } of ANS) for (const h of HABITS) for (const b of BUDGETS) {
+    const pr = JR.studentProfile(cfg, { ...ans, breakfast: h, budget: b });
     const res = {};
     for (const [name, f] of Object.entries(strategies)) {
       const r = play(pr, name.startsWith('Just Right') ? 2 : 1, f);
@@ -107,13 +122,13 @@ console.log('4. Simulated players: every appetite, breakfast habit and budget');
     ok(jr.leftG <= base.leftG + 1e-9, `${a}/${h}/S$${b}: Just Right with the right size never wastes more than the Standard`);
     ok(jr.right >= base.right, `${a}/${h}/S$${b}: Just Right is never less often just right`);
     ok(jr.spent <= base.spent + 1e-9, `${a}/${h}/S$${b}: Just Right never costs more`);
-    if (a === 'big') ok(jr.leftG === base.leftG && jr.right === base.right, `${a}/${h}/S$${b}: big eaters gain nothing from Small (they buy Regular or Add rice)`);
+    if (a === 'big' || pr.appetite >= 1.2) ok(jr.leftG === base.leftG && jr.right === base.right, `${a}/${h}/S$${b}: big eaters gain nothing from Small (they buy Regular or Add rice)`);
     const skipW = JR.runStudentWeek(cfg, pr, 1, [0, 1, 2, 3, 4].map(() => ({ stallId: 'skip', size: 'none', eatenG: 0 })));
     ok(skipW.spent <= b && skipW.hungry === 5 && skipW.leftG === 0, `${a}/${h}/S$${b}: skipping every lunch is handled`);
     if (b === 40) rows.push([a, h, ...Object.values(res).map(r => `${r.leftMeals}/5 left, ${Math.round(r.leftG)} g, ${r.right} right, ${r.stuffed} stuffed, ${r.hungry} hungry, S$${r.spent.toFixed(2)}`)]);
   }
   console.log('\n   Budget S$40. Columns: ' + Object.keys(strategies).join(' | '));
-  rows.forEach(r => console.log('   ' + r[0].padEnd(8) + r[1].padEnd(10) + r.slice(2).join(' | ')));
+  rows.forEach(r => console.log('   ' + r[0].padEnd(13) + r[1].padEnd(10) + r.slice(2).join(' | ')));
 }
 
 console.log(`\n${checks} checks, ${fails} failed`);

@@ -193,9 +193,11 @@
   // =====================================================================
   function studentProfile(cfg, answers) {
     const st = cfg.student;
+    const fromQ5 = st.appetiteFromQ5 && answers.q5 in st.appetiteFromQ5;
     return {
-      appetiteKey: answers.appetite in st.appetite ? answers.appetite : 'average',
-      appetite: st.appetite[answers.appetite] || st.appetite.average,
+      q5: fromQ5 ? answers.q5 : null,
+      appetiteKey: fromQ5 ? 'q5:' + answers.q5 : (answers.appetite in st.appetite ? answers.appetite : 'average'),
+      appetite: fromQ5 ? st.appetiteFromQ5[answers.q5] : (st.appetite[answers.appetite] || st.appetite.average),
       habit: answers.breakfast in st.breakfastHabits ? answers.breakfast : 'sometimes',
       budget: st.budgets.includes(answers.budget) ? answers.budget : st.defaultBudget,
     };
