@@ -1,7 +1,7 @@
 /* Just Right: game engine. No screen code here, so it can be tested on its own.
    One engine, two settings:
      'today'    : one size; "less rice" requests get a smaller scoop at the same price
-     'justright': Regular and Small on the menu board, Small cheaper
+     'justright': Small, Regular and Add rice on the stall's kiosk, in grams with nutrition; Small cheaper
    plus 'shortcut': the vendor quietly shrinks every plate (used to show how ratings drop). */
 (function (root) {
   // ---------- seeded random numbers, so the same day can be replayed exactly
@@ -22,7 +22,7 @@
   const lessShare = cfg => v(cfg, 'smallShare');
   // each stall's Small discount: the biggest survey price step (Q10) that the rice saved on one Small still covers,
   // so a Small never earns the stall less than a Regular. 0 means "same price, less rice".
-  function riceSaved(cfg, riceCostPlate) { return riceCostPlate * (1 - v(cfg, 'smallShare')) * (1 + v(cfg, 'cookBuffer')); }
+  function riceSaved(cfg, riceCostPlate) { return riceCostPlate * (1 - v(cfg, 'smallShare')) * (1 + cookBufferFor(cfg, 'justright')); }   // a Small is only sold under Just Right
   function smallDiscountFor(cfg, riceCostPlate) {
     const saved = riceSaved(cfg, riceCostPlate), steps = cfg.smallDiscountSteps || [0, 0.2, 0.3, 0.5];
     return steps.filter(d => d <= saved + 1e-9).reduce((a, d) => Math.max(a, d), 0);
@@ -64,9 +64,27 @@
       if (q) { const tot = q.answers.reduce((a, x) => a + x[1], 0); let u = r() * tot; o.smallNeed = q.answers[q.answers.length - 1][0];
         for (const [d, n] of q.answers) { if (u < n) { o.smallNeed = d; break; } u -= n; }
         if (o.smallNeed === null) o.smallNeed = Infinity; }
+      o.labelRoll = r();                                      // does the kiosk's nutrition panel tip them to the Small? (Just Right only)
     }
     return out;
   }
+
+  // ---------- the kiosk: nutrition for a plate, and the calorie-label nudge
+  function kioskFactsAt(cfg, stallId, regularG, servedG) {
+    const k = cfg.kiosk; if (!k || !k.dishes[stallId]) return null;
+    const d = k.dishes[stallId], s = k.perG[d.staple];
+    const at = g => ({ kcal: s.kcal * g, protein: s.protein * g, fat: s.fat * g, carbs: s.carbs * g });
+    const base = at(regularG), now = at(servedG), out = { name: d.name, staple: d.staple, grams: servedG };
+    ['kcal', 'protein', 'fat', 'carbs'].forEach(n => { out[n] = Math.max(0, d[n] - base[n]) + now[n]; });   // the rest of the plate stays; the staple scales
+    return out;
+  }
+  // c.labelRoll is drawn per customer; appetite is a share of the plate they are choosing from; cut = Small share / 0.85
+  function labelNudge(cfg, c, appetite, cut) {
+    const k = cfg.kiosk; if (!k || c.labelRoll == null || c.smallNeed === Infinity) return false;
+    return appetite <= cut && c.labelRoll < k.labelSwitch;            // only people a Small would still fill
+  }
+  // under Just Right, kiosk order data trims the extra rice cooked (Champions 12.3: measured kitchens cut waste 26%)
+  function cookBufferFor(cfg, setting) { return v(cfg, 'cookBuffer') * (setting === 'justright' && cfg.kiosk ? 1 - cfg.kiosk.forecastCut : 1); }
 
   // ---------- what the customer asks for
   const asksMore = (c, cfg) => cfg.personas[c.persona].asks === 'more';
@@ -81,6 +99,8 @@
       const wantsSmall = fitsSmall === right;
       // only if the discount is big enough for them (survey Q10); a customer object without the draw keeps the old behaviour
       if (wantsSmall && !(v(cfg, 'discount') + 1e-9 < (c.smallNeed == null ? 0 : c.smallNeed))) return 'small';
+      // the kiosk shows calories for each size: a few people near the line switch to the Small (calorie-label effect, Clarke et al. 2025)
+      if (labelNudge(cfg, c, c.appetite, cut)) return 'small';
       // the Small is not worth it to them: a light eater still asks for less rice, as they would today
       if (c.persona === 'light' && c.appetite <= lessShare(cfg) / 0.85) return 'less';
       return 'regular';
@@ -97,7 +117,7 @@
     if (setting === 'justright' && o === 'less') line = pick(p.line, roll);
     if (setting === 'justright' && o === 'small' && c.persona !== 'quiet') line = pick(ol.small || 'One Small, please.', roll);
     if (setting === 'justright' && o === 'regular' && c.persona === 'light') line = pick(ol.regular || 'Regular, please.', roll);
-    if (setting === 'justright' && o === 'regular' && c.persona === 'quiet') line = pick(ol.quietRegular || '(points at Regular on the board)', roll);
+    if (setting === 'justright' && o === 'regular' && c.persona === 'quiet') line = pick(ol.quietRegular || '(taps Regular on the kiosk)', roll);
     if (setting !== 'justright' && c.persona === 'light' && o === 'regular') line = pick(ol.normalToday || 'Normal portion, thanks.', roll);
     if (c.rusher && !p.alwaysRusher) line += ' ' + pick(cfg.traitLines.rusher, roll);
     if (c.budget && setting !== 'justright') line += ' ' + pick(cfg.traitLines.budget, roll);
@@ -187,7 +207,7 @@
   function runDay(cfg, customers, setting, actions) {
     const R = v(cfg, 'regularRiceG'), riceCostPerG = v(cfg, 'riceCostRegular') / R;
     const t = { setting, customers: customers.length, plates: 0, walkaways: 0, leftFood: 0, smallOrders: 0, hungry: 0, stuffed: 0,
-      servedG: 0, eatenG: 0, plateWasteG: 0, cookedG: 0, unsoldG: 0, revenue: 0, riceCost: 0, otherCost: 0, profit: 0, starsSum: 0, rating: 0, meals: [] };
+      servedG: 0, eatenG: 0, plateWasteG: 0, cookedG: 0, unsoldG: 0, kcalServed: 0, kcalWasted: 0, revenue: 0, riceCost: 0, otherCost: 0, profit: 0, starsSum: 0, rating: 0, meals: [] };
     customers.forEach((c, i) => {
       const a = actions ? actions[i] : standardAction(c, cfg, setting);
       if (a === null) { t.walkaways++; t.starsSum += 2; t.meals.push(null); return; }
@@ -199,8 +219,10 @@
       if (m.fullness === 'hungry') t.hungry++;
       if (m.fullness === 'stuffed') t.stuffed++;
       t.revenue += m.price; t.otherCost += v(cfg, 'toppingCost') + m.extraCost; t.starsSum += m.stars;
+      const f = kioskFactsAt(cfg, 'standard', R, m.served);     // calories on the plate (vendor mode is The Standard's dish)
+      if (f) { m.kcal = f.kcal; m.kcalWasted = m.leftover * cfg.kiosk.perG[f.staple].kcal; t.kcalServed += f.kcal; t.kcalWasted += m.kcalWasted; }
     });
-    t.cookedG = t.servedG * (1 + v(cfg, 'cookBuffer'));     // vendor cooks to match what is served, plus a buffer
+    t.cookedG = t.servedG * (1 + cookBufferFor(cfg, setting));   // vendor cooks to match what is served, plus a buffer (smaller with kiosk data)
     t.unsoldG = t.cookedG - t.servedG;
     t.riceCost = t.cookedG * riceCostPerG;
     t.profit = t.revenue - t.riceCost - t.otherCost;
@@ -265,7 +287,10 @@
       if (jr) options.push({ size: 'small', label: disc > 0 ? 'Small' : 'Small, same price', g: Math.round(g * v(cfg, 'smallShare')), price: round2(Math.max(1, price - disc)), discount: disc });
       // like the vendor game: at a normal-price stall you can ask for more rice at the same price
       if (x.share === 'regular') options.push({ size: 'more', label: 'Add rice', g: Math.round(R * v(cfg, 'addRiceShare')), price });
-      return { ...x, options };
+      // what the kiosk shows: in week 2 (Just Right) every option carries its grams and its nutrition
+      options.forEach(o => { o.facts = kioskFactsAt(cfg, x.id, g, o.g); });
+      const dish = cfg.kiosk && cfg.kiosk.dishes[x.id];
+      return { ...x, options, dish: dish ? dish.name : '', staple: dish ? dish.staple : 'rice', kiosk: jr };
     });
   }
   // skipping lunch is always possible, so a student who runs out of money is never stuck
@@ -331,7 +356,7 @@
     return best;
   }
 
-  const API = { rng, makeCustomers, personaWeights, order, lineFor, ACTIONS, actionsFor, riceSaved, smallDiscountFor, standardAction, meal, bubble, runDay, runRatingDays, breakEvenDiscount, round2,
+  const API = { rng, makeCustomers, personaWeights, order, lineFor, ACTIONS, actionsFor, riceSaved, smallDiscountFor, standardAction, kioskFactsAt, labelNudge, cookBufferFor, meal, bubble, runDay, runRatingDays, breakEvenDiscount, round2,
     studentProfile, studentWeek, studentStalls, maxEatG, studentMeal, afternoon, runStudentWeek, bestFit, SKIP };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.JR = API;
 })(typeof window !== 'undefined' ? window : globalThis);

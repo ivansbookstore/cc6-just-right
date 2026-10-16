@@ -6,7 +6,7 @@
 (function (root) {
   const CONFIG = {
     version: '0.1 (MVP)',
-    build: '0.10',                       // shown bottom-right; bump with every push so a stale cache is easy to spot
+    build: '0.11',                       // shown bottom-right; bump with every push so a stale cache is easy to spot
     params: {
       regularRiceG:   { label: 'Rice/noodles in a Regular plate', value: 200, unit: 'g', min: 150, max: 260, step: 10, source: 'Vendor survey, portion question (answers ~150-250 g)', status: 'vendor' },
       smallShare:     { label: 'Small plate as a share of Regular', value: 0.75, unit: '%', min: 0.5, max: 0.9, step: 0.05, source: 'Group decision (150 g on a 200 g Regular), to test in the pilot. Of 140 g to 170 g, the only size where both the one-stall and the whole-canteen model cut waste without lowering profit or ratings', status: 'assumption', editable: true },
@@ -40,7 +40,7 @@
     calibration: 'Check against the survey: in the model about 35% of Today meals leave food (over 40 simulated days). Our survey of 97 students (23 Never, 23 Rarely, 41 Sometimes, 10 Often, 0 Always) gives about 28% if Rarely means about 15% of meals, Sometimes 40% and Often 70%. That conversion is our assumption, and it suggests the model overstates today\'s waste, and so the waste Just Right saves. The plate-waste photo audit should replace these appetite ranges.',
     personas: {
       light:  { name: 'The Light Eater', icon: 'feather', appetite: [0.80, 1.15], line: ['Auntie, less rice can?', 'Less rice please, cannot finish one.', 'Small bit of rice only, thanks.'], jrLine: ['One Small, please.', 'Small one, thanks.', 'Can I get the Small?'] },
-      quiet:  { name: 'The Quiet One', icon: 'hand-pointing', appetite: [0.80, 1.15], line: ['(points at the dish, says nothing)', '(points, nods, looks at phone)', '(taps the glass at the dish)'], jrLine: ['(points at Small on the board)', '(taps Small on the board)', '(points at the Small price)'] },
+      quiet:  { name: 'The Quiet One', icon: 'hand-pointing', appetite: [0.80, 1.15], line: ['(points at the dish, says nothing)', '(points, nods, looks at phone)', '(taps the glass at the dish)'], jrLine: ['(taps Small on the kiosk)', '(taps Small on the kiosk, says nothing)', '(picks Small on the kiosk)'] },
       usual:  { name: 'The Usual', icon: 'repeat', appetite: [0.95, 1.20], line: ['Same as always.', 'The usual, boss.', 'Normal one, thanks.'], jrLine: ['Regular, thanks.', 'Regular one.', 'Same as always, Regular.'] },
       clean:  { name: 'The Clean-Plater', icon: 'seal-check', appetite: [0.60, 0.85], line: ['Cannot waste food.', 'Whatever you give, I finish.', 'Normal can, I always clear my plate.'], jrLine: ['Regular, thanks.', 'Regular, I always finish.', 'Regular one, please.'], cleanPlater: true },
       picky:  { name: 'The Picky One', icon: 'magnifying-glass', appetite: [0.90, 1.10], line: ["Hmm… what's good today?", 'Is this one nice ah?', 'Hmm… OK lah, this one.'], jrLine: ['Regular… I guess.', 'Hmm, Regular then.', 'Regular, hope it is good today.'] },
@@ -49,12 +49,12 @@
       omad:   { name: 'One Meal a Day', icon: 'clock-afternoon', appetite: [1.25, 1.50], line: 'Boss, add rice, more gravy can? First meal today.', jrLine: 'Regular, add rice please. First meal today.', bigGroup: true, asks: 'more' },
       athlete:{ name: 'The Hall Athlete', icon: 'basketball', appetite: [1.20, 1.45], line: 'Just finished training. Add rice please!', jrLine: 'Regular, add rice please. Just finished training!', bigGroup: true, asks: 'more' },
       late:   { name: 'The Late Luncher', icon: 'person-simple-run', appetite: [1.15, 1.35], line: 'Starving, but class at 2:30. Normal one, fast please!', jrLine: 'Regular, fast please. Class at 2:30!', bigGroup: true, asks: 'regular', alwaysRusher: true },
-      quietbig:{ name: 'The Quiet Big Eater', icon: 'bowl-steam', appetite: [1.20, 1.40], line: '(points at the dish, eyes the rice pot)', jrLine: '(points at Regular, eyes the rice pot)', bigGroup: true, asks: 'regular', quietMore: true },
+      quietbig:{ name: 'The Quiet Big Eater', icon: 'bowl-steam', appetite: [1.20, 1.40], line: '(points at the dish, eyes the rice pot)', jrLine: '(taps Regular on the kiosk, eyes the rice pot)', bigGroup: true, asks: 'regular', quietMore: true },
     },
     traitLines: { rusher: ['Fast fast, got class at 2!', 'Quick ah, lecture starting.', 'Rushing, sorry!'], budget: ['Got cheaper one?', 'Cheapest one can?', 'Anything cheaper?'] },
     // what a light eater says when the order differs from their usual line
     orderLines: { small: ['One Small, please.', 'Small one, thanks.', 'Can I get the Small?'], regular: ['Regular, please.', 'Regular one, thanks.', 'Regular.'],
-      quietRegular: ['(points at Regular on the board)', '(taps Regular on the board)'], normalToday: ['Normal portion, thanks.', 'Normal one.', 'This one, normal.'] },
+      quietRegular: ['(taps Regular on the kiosk)', '(picks Regular on the kiosk)'], normalToday: ['Normal portion, thanks.', 'Normal one.', 'This one, normal.'] },
     // first names are drawn at random, independent of customer type. Fictional customers.
     names: ['Wei Ming', 'Jia Hui', 'Aisyah', 'Arjun', 'Hafiz', 'Priya', 'Jun Jie', 'Nurul', 'Kai Xuan', 'Divya', 'Ryan', 'Mei Ling', 'Farhan', 'Shu Ting', 'Rahul', 'Siti', 'Marcus', 'Xin Yi', 'Imran', 'Kavya',
       'Zhi Hao', 'Hui Min', 'Daniel', 'Amirah', 'Ethan', 'Yi Ting', 'Haziq', 'Sneha', 'Bryan', 'Wen Qi', 'Irfan', 'Meera', 'Javier', 'Pei Shan', 'Danish', 'Ananya', 'Sean', 'Li Ting', 'Faris', 'Rachel'],
@@ -64,6 +64,37 @@
     // Capped at S$0.30, the most common survey answer: in God Mode a bigger discount mostly pulls students from other stalls
     // (S$0.50 at the two big-plate stalls cut canteen profit by about S$6 a lunch for little extra waste saved).
     smallDiscountSteps: [0, 0.20, 0.30],
+    // ---------- the kiosk. NTU stalls already take orders on a kiosk; Just Right adds a size choice in grams and a nutrition panel.
+    // Every number below is sourced; see README "Research behind the kiosk".
+    kiosk: {
+      // staple per gram, cooked. USDA FoodData Central, SR Legacy: rice FDC 168878, egg noodles FDC 169732 (values per 100 g / 100)
+      perG: {
+        rice:    { kcal: 1.30, protein: 0.0269, fat: 0.0028, carbs: 0.282, source: 'USDA FoodData Central 168878, Rice, white, long-grain, regular, enriched, cooked' },
+        noodles: { kcal: 1.38, protein: 0.0454, fat: 0.0207, carbs: 0.252, source: 'USDA FoodData Central 169732, Noodles, egg, enriched, cooked' },
+      },
+      // one dish per stall, whole-plate values from SingHealth HealthXchange with KK Women's and Children's Hospital dietitians.
+      // We treat that plate as the stall's Regular: the staple part scales with the grams chosen, everything else stays.
+      dishes: {
+        generous:    { name: 'Roast duck rice', staple: 'rice', kcal: 673, protein: 24, fat: 20, carbs: 99, servingG: 410 },
+        bigbowl:     { name: 'Roasted chicken rice', staple: 'rice', kcal: 607, protein: 25, fat: 23, carbs: 75, servingG: 382 },
+        smallpricey: { name: 'Laksa lemak', staple: 'noodles', kcal: 591, protein: 17, fat: 32, carbs: 58, servingG: 540 },
+        smallcheap:  { name: 'Minced pork noodles (dry)', staple: 'noodles', kcal: 511, protein: 20, fat: 23, carbs: 57, servingG: 311 },
+        standard:    { name: 'Char siew rice', staple: 'rice', kcal: 605, protein: 24, fat: 16, carbs: 91, servingG: 327 },
+      },
+      dishSource: 'HealthXchange (SingHealth) with KKH dietitians: Best and Worst Singapore Hawker Chinese Food pages',
+      // nutrition panel effect. Evidence: calorie labels cut energy SELECTED by 1.8% (Cochrane, Clarke et al. 2025, high certainty),
+      // mostly by people choosing different items. But for portion size and plate waste the evidence shows no added effect:
+      // calorie labels did not change portion-size orders (Schwartz et al. 2012), information alone did not cut plate waste
+      // in two university canteens (Visschers et al. 2020), and portion-size information did not change intake (Ueland et al. 2009).
+      // So by default the panel is shown but given no extra power. God Mode has a switch to try the Cochrane effect on dish choice:
+      // labelWeight is set so energy selected falls 1.8% versus the same kiosk without the panel (checked in tests/audit_canteen.js).
+      labelSwitch: 0,
+      labelEffectTarget: 0.018,
+      labelWeight: 1.75,
+      // kiosk order data: Champions 12.3 (2019) found restaurants that measured their food waste cut kitchen waste 26% within a year.
+      // We apply that cut to the extra rice cooked beyond what is served (cookBuffer), under Just Right only. Assumption informed by research.
+      forecastCut: 0.26,
+    },
     smallDiscountNeeded: { source: 'Student survey (97 responses), Q10', answers: [[0, 10], [0.20, 10], [0.30, 23], [0.50, 13], [0.80, 20], [null, 21]] },
     patienceSpread: [0.75, 1.30],       // each customer's patience, times the patience setting. Rushers get the bottom half. Game difficulty, not data.
     bigLabel: 'Big appetites',

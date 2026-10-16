@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<meta name="jr-build" content="0.10">
+<meta name="jr-build" content="0.11">
 <meta name="description" content="Just Right: a canteen portion simulation for NTU vendors and students (CC0006 group project).">
 <title>Just Right</title>
 <link rel="preload" href="fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="css/style.css?v=0.10">
+<link rel="stylesheet" href="css/style.css?v=0.11">
 </head>
 <body>
 <main class="wrap">
@@ -35,11 +35,11 @@
   <section id="setup" class="screen">
     <button class="link" data-go="start" id="back-home"></button>
     <div class="card" style="margin-top:8px">
-      <h2>Your stall: economy rice, North Spine</h2>
+      <h2>Your stall: char siew rice, North Spine</h2>
       <p class="muted">Lunch rush, 12:00 to 1:30. Pick how you serve.</p>
       <div class="toggle" role="radiogroup" aria-label="Serving setting">
-        <button class="today" data-setting="today" role="radio"><b>Today</b><span class="muted small">One size. Students can ask for less rice.</span></button>
-        <button class="jr" data-setting="justright" role="radio"><b>Just Right</b><span class="muted small">Regular and Small on the board. Small costs less.</span></button>
+        <button class="today" data-setting="today" role="radio"><b>Today</b><span class="muted small">Today's kiosk: one size. Students can ask for less rice at the counter.</span></button>
+        <button class="jr" data-setting="justright" role="radio"><b>Just Right</b><span class="muted small">The kiosk offers Small, Regular and Add rice in grams, with nutrition for each.</span></button>
       </div>
       <div id="setup-sliders"></div>
       <div id="setup-note"></div>
@@ -140,13 +140,14 @@
 
   <footer>Just Right is a CC0006 Sustainability group project at NTU, open source under the MIT licence. It is a simulation built on our survey data and stated assumptions, not real sales data.</footer>
 </main>
-<script src="src/config.js?v=0.10"></script>
-<script src="src/engine.js?v=0.10"></script>
-<script src="src/icons.js?v=0.10"></script>
-<script src="src/survey.js?v=0.10"></script>
-<script src="src/sound.js?v=0.10"></script>
-<script src="src/ui.js?v=0.10"></script>
-<script src="src/canteen.js?v=0.10"></script>
-<script src="src/god.js?v=0.10"></script>
+<script src="src/config.js?v=0.11"></script>
+<script src="src/engine.js?v=0.11"></script>
+<script src="src/icons.js?v=0.11"></script>
+<script src="src/survey.js?v=0.11"></script>
+<script src="src/sound.js?v=0.11"></script>
+<script src="src/research.js?v=0.11"></script>
+<script src="src/ui.js?v=0.11"></script>
+<script src="src/canteen.js?v=0.11"></script>
+<script src="src/god.js?v=0.11"></script>
 </body>
 </html>

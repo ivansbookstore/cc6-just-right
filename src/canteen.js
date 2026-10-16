@@ -25,6 +25,8 @@
       };
     });
   }
+  // the dish's own plate (before the player edits grams): the nutrition source plate is treated as this size
+  const dishBaseG = (cfg, id) => { const x = cfg.student.stalls.find(s => s.id === id); return !x ? v(cfg, 'regularRiceG') : x.share === 'regular' ? v(cfg, 'regularRiceG') : Math.round(v(cfg, 'regularRiceG') * x.share); };
   const smallPriceAt = st => round2(Math.max(1, st.price - st.discount));
   const effectiveDiscount = st => round2(st.price - smallPriceAt(st));
 
@@ -45,9 +47,10 @@
       size = fits === right && priceOk ? 'small' : lightAsksLess ? 'less' : 'regular';   // no Small for them: ask for less rice, as today
     } else size = lightAsksLess ? 'less' : 'regular';
     const served = { regular: st.g, small: smallG, less: lessG, more: moreG }[size];
+    const facts = JR.kioskFactsAt(cfg, st.id, dishBaseG(cfg, st.id), served);   // what the kiosk shows for this plate
     const price = size === 'small' ? smallPriceAt(st) : st.price;
     const extraCost = size === 'less' && v(cfg, 'todayLessResponse') === 'lessVeg' ? v(cfg, 'extraVegCost') : 0;
-    return { size, served, price, extraCost, need };
+    return { size, served, price, extraCost, need, kcal: facts ? facts.kcal : 0, staple: facts ? facts.staple : 'rice' };
   }
 
   // how a meal ends, once we know how much was eaten and why it stopped. One place, so nothing is counted twice.
@@ -90,12 +93,13 @@
 
   function canteenDay(cfg, stalls, setting, seed, opts) {
     const ct = cfg.canteen, n = (opts && opts.students) || ct.students, w = ct.walkMin, ch = ct.choice;
+    const labelsOn = !!(opts && opts.labelsOn && cfg.kiosk);   // off by default: no proven effect on portion size or plate waste
     const people = JR.makeCustomers(cfg, seed, n);
     const r = JR.rng((seed ^ 0x9E3779B9) >>> 0);
     const times = arrivals(r, n, ct);
     const noise = people.map(() => stalls.map(() => (r() - 0.5) * 2));        // personal taste, drawn once for both settings
     const seatFree = new Array(ct.seats).fill(0);
-    const S = stalls.map(st => ({ id: st.id, busyUntil: 0, plates: 0, revenue: 0, riceCost: 0, otherCost: 0, profit: 0, servedG: 0, cookedG: 0, unsoldG: 0,
+    const S = stalls.map(st => ({ id: st.id, busyUntil: 0, plates: 0, revenue: 0, riceCost: 0, otherCost: 0, profit: 0, servedG: 0, cookedG: 0, unsoldG: 0, kcalServed: 0, kcalWasted: 0,
       wasteG: 0, leftFood: 0, small: 0, less: 0, more: 0, starsSum: 0, right: 0, hungry: 0, stuffed: 0, waitSum: 0 }));
     const out = [];
     people.forEach((c, i) => {
@@ -108,7 +112,8 @@
         // students fear going hungry more than they mind a big plate (that is how plates end up half-finished)
         const under = Math.max(0, o.need - o.served) / o.need, over = Math.max(0, Math.min(o.served, o.need * 1.6) - o.need) / o.need;
         const u = -ch.under * under - ch.over * over - (c.budget ? ch.budgetPrice : ch.price) * (o.price - 5) / 5 - (c.rusher ? ch.rushWait : ch.wait) * wait
-          + (c.persona === 'picky' ? ch.pickyStars : ch.stars) * (st.stars - 4) + ch.noise * noise[i][k];
+          + (c.persona === 'picky' ? ch.pickyStars : ch.stars) * (st.stars - 4) + ch.noise * noise[i][k]
+          - (setting === 'justright' && labelsOn ? cfg.kiosk.labelWeight * (o.kcal - 600) / 600 : 0);   // optional: calorie panel sways dish choice (Clarke et al. 2025)
         if (u > bestU) { bestU = u; best = k; bestO = o; }
       });
       const st = stalls[best], T = S[best], o = bestO;
@@ -136,14 +141,16 @@
       const tDone = tSeat + eatMin; seatFree[si] = tDone + 0.2;
       const tBin = tDone + w * 0.6, tExit = tBin + w;
       // the stall's books
-      const costG = st.riceCost / st.g, cooked = o.served * (1 + v(cfg, 'cookBuffer'));
+      const costG = st.riceCost / st.g, cooked = o.served * (1 + JR.cookBufferFor(cfg, setting));
+      const perG = cfg.kiosk ? cfg.kiosk.perG[o.staple].kcal : 0;
+      T.kcalServed += o.kcal; T.kcalWasted += m.leftover * perG;
       T.plates++; T.revenue += o.price; T.servedG += o.served; T.cookedG += cooked; T.unsoldG += cooked - o.served;
       T.riceCost += cooked * costG; T.otherCost += st.otherCost + o.extraCost; T.wasteG += m.leftover;
       if (m.leftover > v(cfg, 'leftThresholdG')) T.leftFood++;
       if (o.size === 'small') T.small++; if (o.size === 'less') T.less++; if (o.size === 'more') T.more++;
       T.starsSum += m.stars; T[m.fullness]++; T.waitSum += tStart - tAt;
       const mealProfit = o.price - cooked * costG - st.otherCost - o.extraCost;
-      out.push({ i, persona: c.persona, name: p.name, profit: mealProfit, first: c.first, icon: p.icon, budget: c.budget, rusher: c.rusher, stall: best, size: o.size, served: o.served, price: o.price,
+      out.push({ i, persona: c.persona, name: p.name, profit: mealProfit, first: c.first, icon: p.icon, budget: c.budget, rusher: c.rusher, stall: best, size: o.size, served: o.served, price: o.price, kcal: o.kcal, kcalWasted: m.leftover * perG,
         need: o.need, eaten: m.eaten, leftover: m.leftover, fullness: m.fullness, why: m.why, split: m.split, stars: m.stars, seat: si,
         t0, tAt, tStart, tServed, tSeat, tDone, tBin, tExit });
     });
@@ -153,6 +160,7 @@
       wasteG: sum('wasteG'), unsoldG: sum('unsoldG'), cookedG: sum('cookedG'), servedG: sum('servedG'), leftFood: sum('leftFood'), small: sum('small'), less: sum('less'), more: sum('more'),
       right: sum('right'), hungry: sum('hungry'), stuffed: sum('stuffed'), rating: sum('starsSum') / n, avgWait: sum('waitSum') / n,
       endMin: Math.max(...out.map(s => s.tExit)),
+      kcalServed: sum('kcalServed'), kcalWasted: sum('kcalWasted'),
       wasteWhy: ['portion', 'taste', 'time'].reduce((a, k) => (a[k] = out.reduce((x, s) => x + s.split[k], 0), a), {}) };   // adds up to the whole bin
     return { setting, seed, stalls: S, students: out, totals };
   }
@@ -160,6 +168,6 @@
   // rice saved on one Small at this stall (what the discount should not exceed)
   const smallBreakEven = (cfg, st) => round2(JR.riceSaved(cfg, st.riceCost));
 
-  const API = { canteenStalls, canteenDay, orderAt, smallBreakEven, smallPriceAt, effectiveDiscount, outcome };
+  const API = { canteenStalls, canteenDay, orderAt, smallBreakEven, smallPriceAt, effectiveDiscount, outcome, dishBaseG };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.JR_CANTEEN = API;
 })(typeof window !== 'undefined' ? window : globalThis);

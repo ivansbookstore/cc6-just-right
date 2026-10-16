@@ -32,7 +32,7 @@
   const stalls = () => C.canteenStalls(cfg(), G.edits);
   const nStudents = () => G.students || cfg().canteen.students;
   // every setting that changes the lunch: if any differs from the last run, the old run no longer counts as "the same students"
-  const signature = () => JSON.stringify([stalls(), nStudents(), G.seed, Object.entries(cfg().params).map(([k, p]) => [k, p.value])]);
+  const signature = () => JSON.stringify([stalls(), nStudents(), G.seed, !!G.labelsOn, Object.entries(cfg().params).map(([k, p]) => [k, p.value])]);
   function checkSig() { const s = signature(); if (s !== G.sig) { G.sig = s; G.runs = {}; } }
 
   function showSetup() {
@@ -48,6 +48,7 @@
           <h2>The lunch</h2>
           ${gSlider('students', 'Students coming to lunch', nStudents(), ct.studentsMin, ct.studentsMax, 10, x => `${x} students`)}
           ${gSlider('smallShare', 'Just Right: Small plate, share of each Regular', P('smallShare'), 0.5, 0.9, 0.05, x => pct(x))}
+          <label class="switch small"><input type="checkbox" id="god-labels" ${G.labelsOn ? 'checked' : ''}> <span>Let the nutrition panel sway which dish students pick (Cochrane review: calorie labels cut energy selected by 1.8%). Off by default: studies found no added effect on portion size or plate waste.</span></label>
           <p class="muted small">Each stall sets its own Small price (Adjust a stall below). It starts at our rule: the biggest survey price step (S$0.20 or S$0.30) that the rice saved on one Small still covers, so a Small never earns the stall less than a Regular. A stall can also choose S$0: same price, less rice.</p>
           <p class="muted small">Students are drawn from our customer mix: ${pct(P('shareLight'))} light eaters and ${pct(P('shareNeverLeave'))} who never leave food (from our survey of ${(window.JR_SURVEY || {}).n || 97}), plus ${pct(P('shareBig'))} with big appetites (an assumption). <button class="link small" id="god-reseed">${I('arrow-counter-clockwise')}New set of students</button></p>
         </div>
@@ -74,7 +75,9 @@
     return `<div class="slider"><label for="g-${key}"><span>${esc(label)}</span><span id="gv-${key}">${fmt(val)}</span></label>
       <input type="range" id="g-${key}" data-g="${key}" min="${min}" max="${max}" step="${step}" value="${val}"></div>`;
   }
-  const summary = st => `${st.g} g · ${money(st.price)} · ${st.stars.toFixed(1)} stars · ${st.serveSec} s a plate · Small ${st.discount > 0 ? money(st.discount) + ' off' : 'same price'}`;
+  const facts = (st, g) => JR.kioskFactsAt(cfg(), st.id, C.dishBaseG(cfg(), st.id), g);
+  const summary = st => { const d = cfg().kiosk.dishes[st.id], f = facts(st, st.g), fs = facts(st, Math.round(st.g * P('smallShare')));
+    return `${d ? d.name + ': ' : ''}${st.g} g ${d && d.staple === 'noodles' ? 'noodles' : 'rice'}, ${Math.round(f.kcal)} kcal (Small ${Math.round(fs.kcal)} kcal) · ${money(st.price)} · ${st.stars.toFixed(1)} stars · ${st.serveSec} s a plate · Small ${st.discount > 0 ? money(st.discount) + ' off' : 'same price'}`; };
   function stallCard(st) {
     const open = !!G.open[st.id];
     return `<div class="card god-stall" data-stall="${st.id}">
@@ -103,6 +106,7 @@
     document.querySelectorAll('#god-setup [data-st]').forEach(inp => inp.addEventListener('change', () => showSetup()));
     document.querySelectorAll('#god-setup [data-adjust]').forEach(b => b.addEventListener('click', () => { G.open[b.dataset.adjust] = !G.open[b.dataset.adjust]; showSetup(); }));
     $('#god-reseed').addEventListener('click', () => { G.seed = U.newSeed(); showSetup(); });
+    $('#god-labels').addEventListener('change', e => { G.labelsOn = e.target.checked; showSetup(); });
     if ($('#god-rule')) $('#god-rule').addEventListener('click', () => { Object.values(G.edits).forEach(e => delete e.discount); showSetup(); });
     $('#god-reset').addEventListener('click', () => { G.edits = {}; G.open = {}; showSetup(); });
     $('#god-open-today').addEventListener('click', () => start('today'));
@@ -114,7 +118,7 @@
     checkSig();
     const sts = stalls();
     G.stallsUsed = sts;
-    G.run = C.canteenDay(cfg(), sts, setting, G.seed, { students: nStudents() });
+    G.run = C.canteenDay(cfg(), sts, setting, G.seed, { students: nStudents(), labelsOn: G.labelsOn });
     G.setting = setting; G.T = 0; G.dumped = 0; G.floats = []; G.pick = null; G.done = false;
     G.byStall = sts.map((_, k) => G.run.students.filter(s => s.stall === k).sort((a, b) => a.tStart - b.tStart));
     G.binSeries = [];
@@ -324,7 +328,7 @@
   // ---------------------------------------------------------------- the live dashboard
   function liveStats(T) {
     const run = G.run, sts = G.stallsUsed;
-    const out = { arrived: 0, inside: 0, served: 0, eating: 0, finished: 0, binG: 0, leftFood: 0, right: 0, hungry: 0, stuffed: 0, revenue: 0, profit: 0, small: 0, less: 0, more: 0,
+    const out = { kcalBin: 0, kcalServed: 0, arrived: 0, inside: 0, served: 0, eating: 0, finished: 0, binG: 0, leftFood: 0, right: 0, hungry: 0, stuffed: 0, revenue: 0, profit: 0, small: 0, less: 0, more: 0,
       queue: 0, stalls: sts.map(() => ({ plates: 0, profit: 0, wasteG: 0, small: 0, less: 0, queue: 0 })) };
     for (const s of run.students) {
       if (s.t0 > T) continue;
@@ -337,7 +341,8 @@
       }
       if (s.tSeat <= T && s.tDone > T) out.eating++;
       if (s.tDone <= T) { out.finished++; out[s.fullness]++; if (s.leftover > cfg().params.leftThresholdG.value) out.leftFood++; }
-      if (s.tBin <= T) { out.binG += s.leftover; S.wasteG += s.leftover; }
+      if (s.tBin <= T) { out.binG += s.leftover; S.wasteG += s.leftover; out.kcalBin += s.kcalWasted; }
+      if (s.tServed <= T) out.kcalServed += s.kcal;
     }
     return out;
   }
@@ -352,6 +357,7 @@
           <div class="kpi"><div class="v">${x.eating}</div><div class="l">eating</div></div>
           <div class="kpi kbig"><div class="v">${kg(x.binG)}</div><div class="l">food in the waste bin${prev ? ` (${G.setting === 'today' ? 'Just Right' : 'Today'}: ${kg(prev.totals.wasteG)} all lunch)` : ''}</div></div>
           <div class="kpi"><div class="v">${x.finished ? pct(x.leftFood / x.finished) : 'none yet'}</div><div class="l">of finished meals left food</div></div>
+          <div class="kpi"><div class="v">${Math.round(x.kcalBin).toLocaleString()}</div><div class="l">kcal of rice and noodles binned${x.served ? ` (${Math.round(x.kcalServed / x.served)} kcal a plate)` : ''}</div></div>
           <div class="kpi"><div class="v">${money(x.profit)}</div><div class="l">profit so far, all stalls (${money(x.revenue)} sales)</div></div>
         </div>
         <div class="god-full" aria-label="How full students felt">
@@ -442,6 +448,9 @@
           ${row('Food in the waste bin', A.wasteG, B.wasteG, g1, true)}
           ${row('Meals with food left', A.leftFood / A.plates, B.leftFood / B.plates, p1, true, pts)}
           ${row('Rice cooked', A.cookedG, B.cookedG, g1, true)}
+          ${row('Rice cooked but not sold', A.unsoldG, B.unsoldG, g1, true)}
+          ${row('Calories binned (rice and noodles)', A.kcalWasted, B.kcalWasted, x => Math.round(x).toLocaleString() + ' kcal', true)}
+          ${row('Calories per plate', A.kcalServed / A.plates, B.kcalServed / B.plates, x => Math.round(x) + ' kcal', true)}
           ${row('Students just right', A.right, B.right, n0, false)}
           ${row('Students still hungry', A.hungry, B.hungry, n0, true)}
           ${row('Sales, all stalls', A.revenue, B.revenue, m2, false)}

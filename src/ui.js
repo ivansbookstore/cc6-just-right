@@ -46,6 +46,29 @@
   }
 
   // ---------- effects: sound, floating numbers, confetti, count-ups. All motion is skipped when the device asks for reduced motion.
+  // ---------- the kiosk (shared by all three modes). Today: the dish and one price, as NTU kiosks show now.
+  // Just Right: each size with its grams and a nutrition panel (kcal, carbs, protein, fat). Sources in config.js and README.
+  const stapleWord = st => st === 'noodles' ? 'noodles' : 'rice';
+  const kcalTxt = f => `${Math.round(f.kcal)} kcal`;
+  const macroTxt = f => `Carbs ${Math.round(f.carbs)} g · Protein ${Math.round(f.protein)} g · Fat ${Math.round(f.fat)} g`;
+  // opts: { dish, staple, jr, options:[{size,label,g,price,facts,disabled,attrs}], selected, title }
+  function kioskHTML(o) {
+    const rows = o.options.map(x => {
+      const sel = o.selected === x.size, tag = x.tag ? ` <span class="newtag">${x.tag}</span>` : '';
+      const main = o.jr ? `<span class="k-size">${esc(x.label)}${tag}</span><span class="k-g">${x.g} g ${stapleWord(o.staple)}</span>`
+                        : `<span class="k-size">${esc(x.label === 'One size' ? 'Regular plate' : x.label)}${tag}</span>`;
+      const fact = o.jr && x.facts ? `<span class="k-kcal">${kcalTxt(x.facts)}</span><span class="k-macro">${macroTxt(x.facts)}</span>` : '';
+      const inner = `<span class="k-main">${main}</span>${fact}<span class="k-price">${money(x.price)}</span>`;
+      return x.attrs != null ? `<button class="k-row${sel ? ' sel' : ''}" ${x.attrs} ${x.disabled ? 'disabled' : ''}>${inner}</button>`
+                             : `<div class="k-row${sel ? ' sel' : ''}">${inner}</div>`;
+    }).join('');
+    return `<div class="kiosk${o.jr ? ' jr' : ''}">
+      <div class="k-head">${I('device-tablet')}<span>${esc(o.title || 'Kiosk')}</span><b>${esc(o.dish || '')}</b></div>
+      <div class="k-rows">${rows}</div>
+      ${o.note === false ? '' : o.jr ? `<p class="k-note">Grams and nutrition shown for each size. Values: SingHealth HealthXchange (KKH dietitians) and USDA FoodData Central.</p>`
+             : `<p class="k-note">Today's kiosk: one size, no grams or nutrition shown. Less ${stapleWord(o.staple)}? Ask at the counter.</p>`}
+    </div>`;
+  }
   const SND = window.JR_SOUND || { play() {}, sfxOn: () => false, musicOn: () => false, setSfx() {}, setMusic() {} };
   const RM = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const later = (ms, f) => setTimeout(f, RM() ? 0 : ms);
@@ -251,6 +274,9 @@
       <div class="name">${esc(c.first || c.name)}</div>${c.first ? `<div class="ptype">${esc(c.name)}</div>` : ''}
       <div class="traits">${traits.map(t => `<span class="trait">${t}</span>`).join('')}</div>
       <div class="speech">“${esc(JR.lineFor(c, cfg, set))}”</div>
+      ${set === 'justright' ? (() => { const o = JR.order(c, cfg, set), R0 = P('regularRiceG');
+        const t = { small: `Small, ${Math.round(R0 * P('smallShare'))} g rice`, regular: `Regular, ${R0} g rice`, more: `Add rice, ${Math.round(R0 * P('addRiceShare'))} g rice` }[o];
+        return `<div class="ticket">${I('receipt')}${t ? `Kiosk order: <b>${t}</b>` : 'No size picked on the kiosk: asks at the counter'}</div>`; })() : ''}
       <div class="patience" id="patience" role="progressbar" aria-label="Patience"><div></div></div>`;
     cust.style.display = ''; cust.classList.remove('enter'); void cust.offsetWidth; cust.classList.add('enter');
     $('#feedback').className = 'feedback'; $('#feedback').innerHTML = '';
@@ -262,11 +288,12 @@
       return `<button data-act="${k}"><span><span class="key">${i + 1}</span>${esc(lab)}</span><span class="price">${money(price)}</span></button>`;
     }).join('');
     box.querySelectorAll('button').forEach(b => b.addEventListener('click', () => serve(b.dataset.act)));
-    const R = P('regularRiceG');
-    $('#board').innerHTML = `<div class="title">${I('bowl-food')}Menu board</div>` + (set === 'justright'
-      ? `<div class="item"><span>Regular, ${R} g rice</span><span>${money(P('regularPrice'))}</span></div>
-         <div class="item"><span>Small, ${Math.round(R * P('smallShare'))} g rice</span><span>${money(P('regularPrice') - P('discount'))}</span></div>`
-      : `<div class="item"><span>Economy rice</span><span>${money(P('regularPrice'))}</span></div><p class="small muted" style="margin:4px 0 0">One size only.</p>`);
+    const R = P('regularRiceG'), ord = JR.order(c, cfg, set), dish = cfg.kiosk.dishes.standard;
+    const vOpt = (size, label, g, price) => ({ size, label, g, price, facts: JR.kioskFactsAt(cfg, 'standard', R, g) });
+    const vOpts = set === 'justright'
+      ? [vOpt('small', 'Small', Math.round(R * P('smallShare')), P('regularPrice') - P('discount')), vOpt('regular', 'Regular', R, P('regularPrice')), vOpt('more', 'Add rice', Math.round(R * P('addRiceShare')), P('regularPrice'))]
+      : [vOpt('regular', 'One size', R, P('regularPrice'))];
+    $('#board').innerHTML = kioskHTML({ dish: dish.name, staple: dish.staple, jr: set === 'justright', options: vOpts, selected: set === 'justright' ? ord : null, title: set === 'justright' ? 'Kiosk: this customer\'s order' : 'Kiosk' });
     $('#tally').innerHTML = `<div><span>Served</span><b>${so.plates}</b></div>
       <div><span>Walked away</span><b>${so.walkaways}</b></div>
       <div><span>Left food</span><b>${so.leftFood}</b></div>
@@ -389,6 +416,8 @@
           ${r3('Rice cooked but not served', kg(T.unsoldG), kg(J.unsoldG), cmp(T.unsoldG, J.unsoldG, true, kg))}
           ${grp('Society', 4)}
           ${r3('Meals with food left', `${T.leftFood} of ${N}`, `${J.leftFood} of ${N}`, cmp(T.leftFood, J.leftFood, true, x => x))}
+          ${r3('Calories of rice binned', Math.round(T.kcalWasted).toLocaleString() + ' kcal', Math.round(J.kcalWasted).toLocaleString() + ' kcal', cmp(T.kcalWasted, J.kcalWasted, true, x => Math.round(x).toLocaleString() + ' kcal'))}
+          ${r3('Calories per plate', Math.round(T.kcalServed / T.plates) + ' kcal', Math.round(J.kcalServed / J.plates) + ' kcal', cmp(T.kcalServed / T.plates, J.kcalServed / J.plates, true, x => Math.round(x) + ' kcal'))}
           ${r3('Customers who overate', T.stuffed, J.stuffed, cmp(T.stuffed, J.stuffed, true, x => x))}
           ${r3('Customers still hungry', T.hungry, J.hungry, cmp(T.hungry, J.hungry, true, x => x))}
           ${grp('Economy', 4)}
@@ -521,13 +550,15 @@
         <div class="traits" style="justify-content:flex-start">${tags.map(t => `<span class="trait">${t}</span>`).join('')}</div>
         ${hungerBar(0, d.needG)}
       </div>
+      <p class="small muted" style="margin:14px 2px 0">${I('device-tablet')} ${ST.weekNo >= 2 ? 'Just Right kiosks: every size in grams, with calories, carbs, protein and fat (values from SingHealth HealthXchange and USDA FoodData Central).' : 'Today\'s kiosks: one size each, with no grams or nutrition shown.'}</p>
       <div class="stalls">${stalls.map(s => `
         <div class="card stallcard">
           <div class="row" style="gap:10px;align-items:flex-start"><div class="avatar sm">${I(s.icon)}</div>
             <div style="flex:1"><b>${esc(s.name)}</b><p class="muted small" style="margin:2px 0">${esc(s.blurb)}</p>
             <p class="small" style="margin:0">${I('star-fill')} ${s.stars.toFixed(1)}  ·  ${I('timer')} ${s.queueMin} min queue</p></div></div>
-          <div class="opts">${s.options.map(o => `<button class="btn-ic" data-stall="${s.id}" data-size="${o.size}" ${o.price > ST.money + 1e-9 ? 'disabled' : ''}>
-            <span>${esc(o.label)}, ${o.g} g${o.size === 'small' ? ' <span class="newtag">New</span>' : ''}</span><span class="price">${money(o.price)}</span></button>`).join('')}</div>
+          <div class="opts">${kioskHTML({ dish: s.dish, staple: s.staple, jr: s.kiosk, title: 'Order here',
+            note: false, options: s.options.map(o => ({ ...o, label: o.size === 'small' ? (o.discount > 0 ? 'Small' : 'Small, same price') : o.size === 'more' ? 'Add ' + stapleWord(s.staple) : o.label,
+              tag: o.size === 'small' ? 'New' : '', attrs: `data-stall="${s.id}" data-size="${o.size}"`, disabled: o.price > ST.money + 1e-9 })) })}</div>
         </div>`).join('')}</div>
       <p style="margin-top:12px"><button class="link" id="s-skip" data-nosound>Skip lunch today</button></p>`;
     document.querySelectorAll('#s-body .opts').forEach(o => o.setAttribute('data-nosound', ''));
@@ -555,7 +586,8 @@
     const timeLeft = d.rush ? Math.max(0, Math.round((c.timeCap - c.eaten) / cfg.student.biteG * cfg.student.minutesPerBite)) : null;
     $('#s-body').innerHTML = `
       <div class="card eat">
-        <h2>${esc(c.stall.name)}: ${esc(c.option.label.toLowerCase())}, ${c.option.g} g</h2>
+        <h2>${esc(c.stall.name)}: ${esc(c.stall.dish || '')}${c.stall.kiosk ? `, ${esc(c.option.label.toLowerCase())} ${c.option.g} g` : ''}</h2>
+        ${c.stall.kiosk && c.option.facts ? `<p class="small muted" style="margin:0">The kiosk said: ${kcalTxt(c.option.facts)}. ${macroTxt(c.option.facts)}.</p>` : ''}
         <div class="plates${prevEaten != null && !RM() ? ' chomp' : ''}" style="margin:8px 0">${plateSVG(onPlate, 'On your plate', 150, prevOnPlate, true)}</div>
         ${hungerBar(c.eaten, d.needG, prevEaten)}
         ${d.rush ? `<p class="small">${I('timer')} ${timeLeft} ${timeLeft === 1 ? 'minute' : 'minutes'} of eating time left.</p>` : ''}
@@ -795,7 +827,7 @@
           <h2>The model</h2>
           <p>Every customer has a hidden appetite. They eat what they want and leave the rest, unless they are a Clean-Plater, who finishes everything and overeats instead. Taste letdowns and rushing make people leave food whatever the plate size.</p>
           <p class="small">With Just Right, a customer whose hunger fits the Small only takes it if the discount is big enough for them. How big comes from our survey question 10: ${(() => { const q = cfg.smallDiscountNeeded; return q ? q.answers.map(([d, n]) => `${n} of 97 ${d === null ? 'would not take it' : d === 0 ? 'would take it at the same price' : 'need ' + money(d) + (d === 0.8 ? ' (our reading of "more than 50 cents")' : '')}`).join(', ') : ''; })()}. Light eaters who skip the Small can still ask for less rice, as they do today.</p>
-          <p><b>Today</b> has one size: light eaters who speak up ask for less rice, quiet ones get a Regular. <b>Just Right</b> puts Regular and Small on the board, so everyone can point at the size that fits. Both use exactly the same customers, so any difference comes from the menu, not luck.</p>
+          <p><b>Today</b> has one size: light eaters who speak up ask for less rice, quiet ones get a Regular. <b>Just Right</b> puts Small, Regular and Add rice on the stall's kiosk, in grams and with nutrition, so everyone can pick the size that fits without having to ask. Both use exactly the same customers, so any difference comes from the menu, not luck.</p>
           <p>Profit is takings minus rice cost minus everything else on the plate. A Small plate breaks even when the discount is no more than the rice it saves: rice cost × (1 − Small share) × (1 + cooking buffer), which is <b>${money(JR.breakEvenDiscount(cfg))}</b> with the current settings.</p>
           <p>Customers score each meal from 1 to 5 stars: up for "just nice", down for still hungry, overeating, a taste letdown, or feeling short-changed. In the shortcut, tomorrow's customers rise or fall with today's rating.</p>
           <p class="muted small">${esc(cfg.calibration)}</p>
@@ -814,11 +846,28 @@
           <tr><th>Stall</th><th class="num">Plate</th><th class="num">Price</th><th class="num">Queue</th><th class="num">Stars</th></tr>
           ${JR.studentStalls(cfg, 2).map(x => `<tr><td>${esc(x.name)}</td><td class="num">${x.options.map(o => o.g + ' g').join(', ')}</td><td class="num">${x.options.map(o => money(o.price)).join(', ')}</td><td class="num">${x.queueMin} min</td><td class="num">${x.stars.toFixed(1)}</td></tr>`).join('')}
         </table></div>
-        <p class="muted small">All student-mode numbers are assumptions for the game, not survey data. The Standard uses the vendor Regular plate. In week 2 Just Right is canteen-wide: every stall adds a Small plate with the vendor Small share of its own rice, for the vendor discount less. So both modes agree.</p>
+        <p class="muted small">All student-mode numbers are assumptions for the game, not survey data. The Standard uses the vendor Regular plate. In week 2 Just Right is canteen-wide: every stall's kiosk adds a Small plate with the Small share of its own rice, and shows grams and nutrition; each stall's discount follows the rice-saving rule. In week 1 the kiosk shows one size, with no grams or nutrition, as kiosks do today.</p>
         <h3>God Mode</h3>
         <p class="small">A whole canteen at lunch: the five student-mode stalls, ${cfg.canteen.seats} seats, one food waste bin and ${cfg.canteen.students} students by default, drawn from the same customer mix as vendor mode. Students pick a stall by how hungry they are, the price, the queue and the rating, plus personal taste; they avoid plates too small for them more than plates too big (our assumption). They eat for ${cfg.canteen.eatBaseMin} minutes plus ${cfg.canteen.eatGPerMin} g of rice a minute, and students in a rush leave ${cfg.canteen.rushLeaveMin} minutes after walking in. Other ingredients cost the same share of the price as in vendor mode. Today and Just Right run with the very same students, so the difference is the menu alone.</p>
         <h3>Where you stand</h3>
         <p class="small">That screen compares your own answers with ${SV.n} NTU students who answered our Google Form (${esc(SV.collected)}). It shows counts only, with no individual responses, and nothing you tap is saved or sent. Your game week is placed on question 2 by days with food left: 0 Never, 1 Rarely, 2 to 3 Sometimes, 4 Often, 5 Always (our mapping).</p>
+      </div>
+      <div class="card" style="margin-top:12px" id="research">
+        <h2>${I('books')} Research behind the kiosk</h2>
+        <p class="small">Under Just Right every stall's kiosk shows each size in grams with its calories, carbs, protein and fat. Here is what the research says that does, and how the game uses it. Each source was opened and checked against its original page.</p>
+        <div class="tablewrap"><table class="small">
+          <tr><th>Model against research</th><th class="num">Our model</th><th class="num">Research</th></tr>
+          ${(() => { let tw = 0, jw = 0, sm = 0, n = 0, tk = 0, jk = 0;
+            for (let sd = 1; sd <= 100; sd++) { const cs = JR.makeCustomers(cfg, sd, 80), t = JR.runDay(cfg, cs, 'today'), j = JR.runDay(cfg, cs, 'justright');
+              tw += t.plateWasteG; jw += j.plateWasteG; sm += j.smallOrders; n += j.plates; tk += t.kcalServed; jk += j.kcalServed; }
+            return `<tr><td>Plate waste cut by offering a smaller size</td><td class="num">${pct(1 - jw / tw)}</td><td class="num">20% (Visschers 2020; Kallbekken 2013)</td></tr>
+              <tr><td>Customers who take the smaller size</td><td class="num">${pct(sm / n)}</td><td class="num">14% to 33% when offered (Schwartz 2012); small meals at 10% of large-meal sales (Vermeer 2011)</td></tr>
+              <tr><td>Calories served per plate</td><td class="num">${pct(1 - jk / tk)} fewer</td><td class="num">1.8% fewer selected with calorie labels (Clarke 2025)</td></tr>`; })()}
+        </table></div>
+        <p class="muted small">One-stall model, 100 simulated days of 80 plates, our default settings. Our cut sits below the research figures, so the game is on the cautious side.</p>
+        <div class="research">${(window.JR_RESEARCH || []).map(r => `<details><summary><b>${esc(r.short)}</b> <span class="muted">${esc(r.topic)}</span></summary>
+          <p class="small"><b>Finding.</b> ${esc(r.finding)}</p><p class="small"><b>How the game uses it.</b> ${esc(r.use)}</p>${r.caveat ? `<p class="small"><b>Limits.</b> ${esc(r.caveat)}</p>` : ''}
+          <p class="small muted">${esc(r.cite)}. <a href="${r.url}" target="_blank" rel="noopener">Source</a></p></details>`).join('')}</div>
       </div>
       <div class="card" style="margin-top:12px">
         <h2>Every number</h2>

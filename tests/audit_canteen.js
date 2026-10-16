@@ -125,5 +125,27 @@ console.log('5. The Just Right defaults are a best case: less waste, profit and 
   console.log(`   one stall: ${(v.tw / 200).toFixed(0)} g -> ${(v.jw / 200).toFixed(0)} g plate waste a day, profit S$${(v.tp / 200).toFixed(2)} -> S$${(v.jp / 200).toFixed(2)}; canteen: ${(g.tw / 24000).toFixed(2)} -> ${(g.jw / 24000).toFixed(2)} kg, S$${(g.tp / 24).toFixed(2)} -> S$${(g.jp / 24).toFixed(2)}`);
 }
 
+console.log('6. The kiosk: nutrition values, calorie-label calibration, order data');
+{
+  const JR = require('../src/engine.js'), cfg = fresh(), k = cfg.kiosk;
+  for (const st of C.canteenStalls(cfg)) {
+    const base = C.dishBaseG(cfg, st.id), d = k.dishes[st.id];
+    const reg = JR.kioskFactsAt(cfg, st.id, base, base);
+    ok(['kcal', 'protein', 'fat', 'carbs'].every(n => Math.abs(reg[n] - d[n]) < 1e-9), `${st.id}: the Regular shows the published plate values (${d.kcal} kcal)`);
+    const small = JR.kioskFactsAt(cfg, st.id, base, Math.round(base * 0.75)), more = JR.kioskFactsAt(cfg, st.id, base, Math.round(base * 1.25));
+    ok(small.kcal < reg.kcal && reg.kcal < more.kcal, `${st.id}: calories rise with the grams chosen`);
+    ok(Math.abs((reg.kcal - small.kcal) - (base - Math.round(base * 0.75)) * k.perG[d.staple].kcal) < 1e-6, `${st.id}: only the ${d.staple} changes between sizes`);
+    ok(['kcal', 'protein', 'fat', 'carbs'].every(n => JR.kioskFactsAt(cfg, st.id, base, 0)[n] >= 0), `${st.id}: no negative nutrition`);
+  }
+  // the optional calorie panel effect in God Mode matches the Cochrane estimate (1.8% fewer calories selected)
+  const sel = (on) => { const st = C.canteenStalls(cfg); let kc = 0, n = 0; for (let s = 1; s <= 40; s++) { const t = C.canteenDay(cfg, st, 'justright', s, { labelsOn: on }).totals; kc += t.kcalServed; n += t.plates; } return kc / n; };
+  const off = sel(false), on = sel(true), cut = 1 - on / off;
+  ok(Math.abs(cut - k.labelEffectTarget) < 0.004, `calorie panel switch: ${(cut * 100).toFixed(2)}% fewer calories selected (target ${(k.labelEffectTarget * 100).toFixed(1)}%)`);
+  ok(JR.cookBufferFor(cfg, 'justright') < JR.cookBufferFor(cfg, 'today') && Math.abs(JR.cookBufferFor(cfg, 'justright') - cfg.params.cookBuffer.value * (1 - k.forecastCut)) < 1e-12, 'kiosk order data trims the extra rice cooked under Just Right only');
+  const cs = JR.makeCustomers(cfg, 3, 400), t = JR.runDay(cfg, cs, 'today'), j = JR.runDay(cfg, cs, 'justright');
+  ok(j.kcalServed / j.plates < t.kcalServed / t.plates && j.kcalWasted < t.kcalWasted, 'one stall: Just Right serves and bins fewer calories');
+  console.log(`   calorie panel: ${(cut * 100).toFixed(2)}% fewer kcal selected; one stall kcal/plate ${(t.kcalServed / t.plates).toFixed(0)} -> ${(j.kcalServed / j.plates).toFixed(0)}`);
+}
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);
