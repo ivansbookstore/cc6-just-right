@@ -6,7 +6,7 @@
 (function (root) {
   const CONFIG = {
     version: '0.1 (MVP)',
-    build: '0.11',                       // shown bottom-right; bump with every push so a stale cache is easy to spot
+    build: '0.11.1',                       // shown bottom-right; bump with every push so a stale cache is easy to spot
     params: {
       regularRiceG:   { label: 'Rice/noodles in a Regular plate', value: 200, unit: 'g', min: 150, max: 260, step: 10, source: 'Vendor survey, portion question (answers ~150-250 g)', status: 'vendor' },
       smallShare:     { label: 'Small plate as a share of Regular', value: 0.75, unit: '%', min: 0.5, max: 0.9, step: 0.05, source: 'Group decision (150 g on a 200 g Regular), to test in the pilot. Of 140 g to 170 g, the only size where both the one-stall and the whole-canteen model cut waste without lowering profit or ratings', status: 'assumption', editable: true },

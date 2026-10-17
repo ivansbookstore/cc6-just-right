@@ -16,6 +16,7 @@
   const G = { edits: {}, students: null, seed: U.urlSeed != null ? U.urlSeed : U.newSeed(), runs: {}, sig: '', open: {}, run: null, T: 0, speed: 3, playing: false, raf: 0, last: 0, dumped: 0, floats: [], pick: null };
 
   $('#go-god').innerHTML = `${I('map-trifold')}<span><b>God Mode: the whole canteen</b><span class="muted">Set up five stalls, open the doors, and watch the waste bin fill.</span></span>${I('arrow-left', 'flip')}`;
+  $('#go-god .flip').style.transform = 'scaleX(-1)';
   $('#god-home').innerHTML = I('arrow-left') + 'Home';
   $('#go-god').addEventListener('click', () => { U.go('god'); });
   document.addEventListener('jr:screen', e => { document.body.classList.toggle('wide', e.detail === 'god'); if (e.detail === 'god') { stop(); showSetup(); } else stop(); });
